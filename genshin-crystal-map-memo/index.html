@@ -105,26 +105,6 @@
       current = (current + 1) % slides.length;
       animateSlide(-1);
     }
-    // スワイプ操作のみ（スマホ表示時）
-    let touchStartX = null;
-    img.addEventListener('touchstart', function(e) {
-      if (e.touches.length === 1) {
-        touchStartX = e.touches[0].clientX;
-      }
-    });
-    img.addEventListener('touchend', function(e) {
-      if (touchStartX === null) return;
-      const touchEndX = e.changedTouches[0].clientX;
-      const dx = touchEndX - touchStartX;
-      if (Math.abs(dx) > 50) {
-        if (dx < 0) {
-          next(); // 左スワイプ
-        } else {
-          prev(); // 右スワイプ
-        }
-      }
-      touchStartX = null;
-    });
     // ダブルタップによる拡大を防止
     let lastTouchEnd = 0;
     document.addEventListener('touchend', function(e) {
