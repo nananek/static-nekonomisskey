@@ -1,13 +1,17 @@
 import os
 import json
 from psd_tools import PSDImage
-from PIL import Image
+from PIL import Image, ImageFilter, ImageOps
+import numpy as np
 import math
 
 psd_path = 'map.psd'
 output_dir = 'slides'
 html_path = 'index.html'
 margin = 20
+
+outline_width = 5  # px
+outline_color = (0, 0, 0, 0xcc) # RGBAで指定可能
 
 os.makedirs(output_dir, exist_ok=True)
 
@@ -18,9 +22,60 @@ canvas_size = base.size
 slide_files = []
 for i, layer in enumerate(psd[1:], start=1):
     layer_img = layer.topil()
+    w, h = layer_img.size
+    double_size = (w * 2, h * 2)
+    double_img = Image.new('RGBA', double_size, (0, 0, 0, 0))
+    double_img.paste(layer_img, (w // 2, h // 2), layer_img)
+    # --- アウトライン処理 ---
+    alpha = double_img.split()[-1]
+    outline_mask = ImageOps.expand(alpha, border=outline_width, fill=0)
+    outline_mask = outline_mask.filter(ImageFilter.MaxFilter(outline_width * 2 + 1))
+    outline_mask = outline_mask.crop((outline_width, outline_width, alpha.width + outline_width, alpha.height + outline_width))
+    outline_img = Image.new('RGBA', double_img.size, (0, 0, 0, 0))
+    outline_arr = np.array(outline_img)
+    mask_arr = np.array(outline_mask)
+    # RGBA対応
+    if len(outline_color) == 4:
+        rgba = np.array(outline_color, dtype=np.uint8)
+        outline_arr[mask_arr > 0] = rgba
+    else:
+        # 3要素(RGB)の場合はアルファ255
+        rgb = np.array(list(outline_color) + [255], dtype=np.uint8)
+        outline_arr[mask_arr > 0] = rgb
+    outline_img = Image.fromarray(outline_arr, 'RGBA')
+    orig_alpha = np.array(alpha)
+    outline_arr[..., 3] = np.where(orig_alpha > 0, 0, outline_arr[..., 3])
+    outline_img = Image.fromarray(outline_arr, 'RGBA')
+    outline_img.paste(double_img, (0, 0), double_img)
+    # --- 余白トリミング ---
+    bbox = outline_img.getbbox()
+    if not bbox:
+        continue
+    trimmed_img = outline_img.crop(bbox)
+    trim_w, trim_h = trimmed_img.size
+    # --- offset調整 ---
     offset_x, offset_y = layer.offset
+    # 元レイヤーの中心（キャンバス座標）
+    center_x = offset_x + w // 2
+    center_y = offset_y + h // 2
+    # トリミング後画像の中心（ローカル座標）
+    bbox_left, bbox_top, bbox_right, bbox_bottom = bbox
+    trim_center_x = (bbox_right - bbox_left) // 2
+    trim_center_y = (bbox_bottom - bbox_top) // 2
+    # キャンバス上の貼り付け位置
+    paste_x = center_x - trim_center_x
+    paste_y = center_y - trim_center_y
+    # full_layerにアウトライン→元画像の順で合成
     full_layer = Image.new('RGBA', canvas_size, (0, 0, 0, 0))
-    full_layer.paste(layer_img, (offset_x, offset_y), layer_img)
+    full_layer.paste(trimmed_img, (paste_x, paste_y), trimmed_img)  # アウトライン
+    # 元画像も2倍・トリミングして同じ位置に貼る（RGB部分は完全不透明で上書き）
+    trimmed_orig = double_img.crop(bbox)
+    # RGB部分だけをfull_layerに上書き
+    rgb = trimmed_orig.convert('RGB')
+    mask = trimmed_orig.split()[-1].point(lambda a: 255 if a > 0 else 0)
+    rgb_img = Image.new('RGBA', trimmed_orig.size)
+    rgb_img.paste(rgb, (0, 0))
+    full_layer.paste(rgb_img, (paste_x, paste_y), mask)
 
     bbox = layer.bbox
     if not bbox:
@@ -62,137 +117,9 @@ for i, layer in enumerate(psd[1:], start=1):
 
     slide_files.append(f"{output_dir}/{filename}")
 
-# HTML全体
-slides_json = json.dumps(slide_files, ensure_ascii=False, indent=2)
-html_content = f'''<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>鉱石ルートメモ</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    html, body {{
-      height: 100%;
-    }}
-    body {{
-      background-color: #f8f9fa;
-      text-align: center;
-      padding: 0;
-      margin: 0;
-      height: 100vh;
-    }}
-    .container {{
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: 1rem;
-    }}
-    .slide-wrapper {{
-      flex-grow: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }}
-    #slide {{
-      max-height: 80vh;
-      max-width: 100vw;
-      width: auto;
-      height: auto;
-      object-fit: contain;
-      border: 1px solid #ccc;
-      background: white;
-      box-sizing: border-box;
-    }}
-    .slide-controls {{
-      margin-top: 1.5rem;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 1rem;
-    }}
-    .slide-controls button {{
-      min-width: 90px;
-      font-size: 1.1rem;
-      padding: 0.6em 1.2em;
-    }}
-    #counter {{
-      font-size: 1.1rem;
-      min-width: 70px;
-      display: inline-block;
-    }}
-    @media (max-width: 600px) {{
-      .slide-controls {{
-        flex-direction: column;
-        gap: 0.5rem;
-      }}
-      #slide {{
-        max-height: 60vh;
-        max-width: 98vw;
-      }}
-    }}
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="slide-wrapper">
-      <img id="slide" src="" alt="Slide" class="rounded shadow">
-    </div>
-    <div class="slide-controls">
-      <button class="btn btn-secondary" onclick="prev()">前へ</button>
-      <span id="counter"></span>
-      <button class="btn btn-primary" onclick="next()">次へ</button>
-    </div>
-  </div>
-  <script id="slides-json" type="application/json">
-{slides_json}
-  </script>
-  <script>
-    const slides = JSON.parse(document.getElementById("slides-json").textContent.trim());
-    let current = 0;
-    const img = document.getElementById('slide');
-    const counter = document.getElementById('counter');
-    function update() {{
-      img.src = slides[current];
-      counter.textContent = (current + 1) + ' / ' + slides.length;
-    }}
-    function prev() {{
-      current = (current - 1 + slides.length) % slides.length;
-      update();
-    }}
-    function next() {{
-      current = (current + 1) % slides.length;
-      update();
-    }}
-    // スワイプ操作対応
-    let touchStartX = null;
-    img.addEventListener('touchstart', function(e) {{
-      if (e.touches.length === 1) {{
-        touchStartX = e.touches[0].clientX;
-      }}
-    }});
-    img.addEventListener('touchend', function(e) {{
-      if (touchStartX === null) return;
-      const touchEndX = e.changedTouches[0].clientX;
-      const dx = touchEndX - touchStartX;
-      if (Math.abs(dx) > 50) {{
-        if (dx < 0) {{
-          next(); // 左スワイプ
-        }} else {{
-          prev(); // 右スワイプ
-        }}
-      }}
-      touchStartX = null;
-    }});
-    update();
-  </script>
-</body>
-</html>
-'''
+# slides.jsonとして保存
+slides_json_path = 'slides.json'
+with open(slides_json_path, 'w', encoding='utf-8') as f:
+    json.dump(slide_files, f, ensure_ascii=False, indent=2)
 
-# HTML出力
-with open(html_path, 'w', encoding='utf-8') as f:
-    f.write(html_content)
-
-print(f'✅ index.html を出力しました: {html_path}')
+print(f'✅ slides.json を出力しました: {slides_json_path}')
