@@ -2,6 +2,7 @@ import os
 import json
 from psd_tools import PSDImage
 from PIL import Image
+import math
 
 psd_path = 'map.psd'
 output_dir = 'slides'
@@ -29,6 +30,15 @@ for i, layer in enumerate(psd[1:], start=1):
     center_x = (x1 + x2) // 2
     center_y = (y1 + y2) // 2
     crop_w, crop_h = 1280, 720
+    bbox_w = x2 - x1
+    bbox_h = y2 - y1
+    # bboxが1280x720より大きい場合は、bbox全体が収まる最小の16:9サイズに拡大
+    scale_w = bbox_w / 1280
+    scale_h = bbox_h / 720
+    scale = max(1, max(scale_w, scale_h))
+    crop_w = math.ceil(1280 * scale)
+    crop_h = math.ceil(720 * scale)
+    # 切り出し範囲を決定
     left = max(center_x - crop_w // 2, 0)
     top = max(center_y - crop_h // 2, 0)
     right = min(left + crop_w, canvas_size[0])
