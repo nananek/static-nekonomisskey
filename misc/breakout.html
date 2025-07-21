@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pyodide Breakout Clone</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.5/full/pyodide.js"></script>
+  <style>
+    :root{
+      --bg:#f8f9fb;
+      --canvas-bg:#ffffff;
+      /* Okabe & Ito distinct colours */
+      --oi-orange:#E69F00; --oi-sky:#56B4E9; --oi-green:#009E73; --oi-yellow:#F0E442;
+      --oi-blue:#0072B2;  --oi-vermilion:#D55E00; --oi-purple:#CC79A7;
+    }
+    html,body{margin:0;height:100%;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui,"Segoe UI",sans-serif;color:#333}
+    #game{background:var(--canvas-bg);border:1px solid #ccd;box-shadow:0 0 4px rgba(0,0,0,.08)}
+    #game:hover{cursor:none}
+    .overlay{position:fixed;inset:0;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;z-index:20;text-align:center}
+    h1{margin:.2rem 0;font-size:2rem}
+    #subMsg{margin:.8rem 0 1.2rem;font-size:1.1rem;color:#555;white-space:pre-wrap}
+    button{padding:.6rem 1.4rem;font-size:1rem;border:none;border-radius:6px;background:var(--oi-blue);color:#fff;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,.12);transition:background .2s}
+    button:hover{background:#005495}
+  </style>
+</head>
+<body>
+  <canvas id="game" width="640" height="480"></canvas>
+
+  <div id="overlay" class="overlay" style="display:flex">
+    <div id="menu">
+      <h1 id="title">Breakout</h1>
+      <p id="subMsg">Destroy all blocks with the ball.</p>
+      <button id="startBtn">Start</button>
+      <button id="restartBtn" style="display:none">Restart</button>
+    </div>
+  </div>
+
+  <!-- Lightweight synthesised SFX (Web Audio) ---------------------------------- -->
+  <script>
+    function playSound(kind){
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      const now = ctx.currentTime;
+      let freq = 392; // default collision (G4)
+      if(kind==='start')       freq = 523.25; // C5
+      else if(kind==='clear')  freq = 659.25; // E5
+      else if(kind==='over')   freq = 196.00; // G3
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now+0.15);
+      osc.start(now); osc.stop(now+0.15);
+    }
+  </script>
+
+  <!-- Python ------------------------------------------------------------------- -->
+  <script id="pycode" type="text/python">
+from js import document, window
+from pyodide.ffi import create_proxy
+
+WIDTH, HEIGHT = 640, 480
+canvas = document.getElementById("game")
+ctx    = canvas.getContext("2d")
+
+# Mouse tracking across entire window -----------------------------------------
+window.mouseX = WIDTH // 2
+
+def _on_move(evt):
+    rect = canvas.getBoundingClientRect()
+    window.mouseX = evt.clientX - rect.left
+
+document.addEventListener("mousemove", create_proxy(_on_move))
+
+# Palette ----------------------------------------------------------------------
+COLORS = {
+    "orange":"#E69F00","sky":"#56B4E9","green":"#009E73","yellow":"#F0E442",
+    "blue":"#0072B2","vermilion":"#D55E00","purple":"#CC79A7",
+}
+PADDLE_COLOR = COLORS["blue"]
+BALL_COLOR   = COLORS["vermilion"]
+BRICK_ROW_COLORS = [COLORS[c] for c in ("orange","sky","green","yellow","purple")]
+
+# Constants --------------------------------------------------------------------
+PADDLE_W,PADDLE_H = 90,14
+BALL_R            = 6
+ROWS,COLS         = 5,10
+BRICK_W           = WIDTH//COLS
+BRICK_H           = 22
+
+# Game objects -----------------------------------------------------------------
+class Paddle:
+    def __init__(self):
+        self.x = WIDTH//2; self.y = HEIGHT-50
+    def update(self,mx):
+        self.x = max(PADDLE_W//2,min(mx, WIDTH-PADDLE_W//2))
+    def draw(self):
+        ctx.fillStyle = PADDLE_COLOR
+        ctx.fillRect(self.x-PADDLE_W//2, self.y-PADDLE_H//2, PADDLE_W, PADDLE_H)
+
+class Ball:
+    def __init__(self):
+        from random import choice; self.reset(choice([-3,3]))
+    def reset(self,vx=3):
+        self.x,self.y = WIDTH//2,HEIGHT//2; self.vx,self.vy = vx,-3
+    def step(self):
+        self.x+=self.vx; self.y+=self.vy
+        if self.x< BALL_R or self.x> WIDTH-BALL_R: self.vx*=-1
+        if self.y< BALL_R: self.vy*=-1
+    def draw(self):
+        ctx.beginPath(); ctx.arc(self.x,self.y,BALL_R,0,6.283); ctx.closePath();
+        ctx.fillStyle=BALL_COLOR; ctx.fill()
+
+paddle= Paddle(); ball= Ball(); bricks=[True]*(ROWS*COLS); score=0; state="ready"
+_overlay=document.getElementById("overlay"); _title=document.getElementById("title");
+_sub=document.getElementById("subMsg"); _start=document.getElementById("startBtn"); _restart=document.getElementById("restartBtn")
+
+# Overlay helpers --------------------------------------------------------------
+
+def _show(title,msg,show_restart):
+    _title.innerText=title; _sub.innerText=msg; _overlay.style.display="flex"
+    _start.style.display="none" if show_restart else "inline-block"
+    _restart.style.display="inline-block" if show_restart else "none"
+    if state=="clear": _restart.innerText="Play Again"
+
+def _hide(): _overlay.style.__setattr__("display","none")
+
+# Game control -----------------------------------------------------------------
+
+def start_game():
+    global state,score
+    score=0; bricks[:]=[True]*len(bricks); ball.reset(); state="running"; _hide(); window.playSound("start")
+
+def restart_game(): start_game()
+
+# Collision --------------------------------------------------------------------
+
+def collide_bricks():
+    global score
+    col=int(ball.x//BRICK_W); row=int(ball.y//BRICK_H)
+    if 0<=row<ROWS and 0<=col<COLS:
+        idx=row*COLS+col
+        if bricks[idx]:
+            bricks[idx]=False; ball.vy*=-1; score+=10; window.playSound("collision")
+
+def collide_paddle():
+    if (paddle.y-PADDLE_H//2-BALL_R<=ball.y<=paddle.y+PADDLE_H//2 and
+        paddle.x-PADDLE_W//2-BALL_R<=ball.x<=paddle.x+PADDLE_W//2+BALL_R and ball.vy>0):
+        ball.vy*=-1; ball.vx=((ball.x-paddle.x)/(PADDLE_W//2))*4; window.playSound("collision")
+
+# Drawing ----------------------------------------------------------------------
+
+def draw_bricks():
+    for r in range(ROWS):
+        ctx.fillStyle=BRICK_ROW_COLORS[r]
+        for c in range(COLS):
+            if bricks[r*COLS+c]: ctx.fillRect(c*BRICK_W+1,r*BRICK_H+1,BRICK_W-2,BRICK_H-2)
+
+# Main loop --------------------------------------------------------------------
+
+def _update(*_):
+    global state
+    ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,WIDTH,HEIGHT)
+
+    if state=="running":
+        paddle.update(window.mouseX); ball.step(); collide_bricks(); collide_paddle()
+        if ball.y>HEIGHT:
+            state="gameover"; _show("GAME OVER",f"Your Score : {score}",True); window.playSound("over")
+        if all(not b for b in bricks):
+            state="clear"; _show("CONGRATULATIONS!",f"Your Score : {score}",True); window.playSound("clear")
+        draw_bricks(); paddle.draw(); ball.draw()
+        ctx.fillStyle="#555"; ctx.font="16px sans-serif"; ctx.textAlign="left"; ctx.fillText(f"Score : {score}",12,HEIGHT- 20)
+    else:
+        ctx.fillStyle="#ddd"; ctx.font="24px sans-serif"; ctx.textAlign="center"; ctx.fillText("Breakout",WIDTH/2,HEIGHT/2-20)
+    window.requestAnimationFrame(loop_proxy)
+
+loop_proxy=create_proxy(_update); window.requestAnimationFrame(loop_proxy)
+  </script>
+
+  <!-- Boot Pyodide & wire buttons -------------------------------------------- -->
+  <script type="module">
+    (async () => {
+      const pyodide = await loadPyodide();
+      await pyodide.runPythonAsync(document.getElementById("pycode").textContent);
+      document.getElementById("startBtn").onclick   = () => pyodide.runPython("start_game()")
+      document.getElementById("restartBtn").onclick = () => pyodide.runPython("restart_game()")
+    })();
+  </script>
+</body>
+</html>

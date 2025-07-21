@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SWF ドラッグ＆ドロップ再生 (Ruffle)</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+
+        h1 {
+            color: #0056b3;
+        }
+
+        #drop-area {
+            width: 800px; /* SWFの推奨サイズに合わせて調整 */
+            height: 600px; /* SWFの推奨サイズに合わせて調整 */
+            border: 3px dashed #007bff;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-size: 1.2em;
+            color: #007bff;
+            background-color: #e6f2ff;
+            cursor: default; /* クリック不可にするため */
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+            position: relative; /* 子要素の配置のため */
+            overflow: hidden; /* 再生されるSWFがはみ出さないように */
+        }
+
+        #drop-area.highlight {
+            background-color: #cce0ff;
+            border-color: #0056b3;
+        }
+
+        #message {
+            margin-top: 10px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        /* Ruffleが生成するプレイヤー要素のスタイル */
+        ruffle-player {
+            width: 100%;
+            height: 100%;
+            display: block; /* ブロック要素として表示 */
+        }
+    </style>
+</head>
+<body>
+    <h1>SWFファイルをここにドラッグ＆ドロップしてください</h1>
+
+    <div id="drop-area">
+        <span id="initial-text">
+            ここに .swf ファイルをドロップ
+        </span>
+        </div>
+
+    <p id="message">ファイルをドロップしてください...</p>
+
+    <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
+
+    <script type="text/javascript">
+        const dropArea = document.getElementById('drop-area');
+        const message = document.getElementById('message');
+        const initialText = document.getElementById('initial-text');
+
+        // --- ドラッグ＆ドロップイベントリスナー ---
+
+        // ドラッグオーバー時のスタイル変更
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
+        });
+
+        // ドロップ時の処理
+        dropArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            handleFiles(files);
+        }
+
+        // --- ファイル処理の共通関数 ---
+        function handleFiles(files) {
+            message.textContent = 'ファイルを処理中...';
+
+            if (files.length === 0) {
+                message.textContent = 'ファイルが選択されていません。';
+                return;
+            }
+
+            const file = files[0]; // 最初のファイルのみ処理
+
+            // ファイルタイプをチェック（MIMEタイプまたは拡張子）
+            if (file.type !== 'application/x-shockwave-flash' && !file.name.toLowerCase().endsWith('.swf')) {
+                message.textContent = 'SWFファイルではありません。';
+                return;
+            }
+
+            // FileReaderを使ってファイルを読み込む
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                // Ruffleプレイヤーを動的に作成し、SWFデータをセット
+                const rufflePlayer = RufflePlayer.newest().createPlayer();
+
+                // 既存のコンテンツをクリア
+                dropArea.innerHTML = '';
+                // 初期テキストを隠す
+                initialText.style.display = 'none';
+
+                dropArea.appendChild(rufflePlayer);
+
+                // Ruffleにファイルデータをロード
+                rufflePlayer.load({ data: new Uint8Array(event.target.result) });
+
+                message.textContent = `"${file.name}" をロードしました。`;
+            };
+            reader.onerror = function() {
+                message.textContent = 'ファイルの読み込み中にエラーが発生しました。';
+            };
+            reader.readAsArrayBuffer(file); // ArrayBufferとしてファイルを読み込む
+        }
+    </script>
+</body>
+</html>
