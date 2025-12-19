@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>申告書パーツ作成ツール 説明書</title>
+    <style>
+        body { line-height: 1.6; color: #333; max-width: 850px; margin: 0 auto; padding: 40px 20px; background-color: #f4f7f9; font-family: "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; }
+        .container { background: #fff; padding: 35px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; font-size: 1.6em; }
+        h2 { color: #2980b9; margin-top: 30px; font-size: 1.3em; display: flex; align-items: center; }
+        h2::before { content: "■"; margin-right: 10px; color: #3498db; }
+        .important { background: #fff3cd; border-left: 5px solid #ffca28; padding: 15px; margin: 20px 0; font-weight: bold; }
+        .logic-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.9em; }
+        .logic-table th, .logic-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .logic-table th { background: #f8f9fa; }
+        code { background: #eee; padding: 2px 4px; border-radius: 3px; font-family: Consolas, monospace; }
+        .footer { margin-top: 40px; text-align: center; font-size: 0.85em; color: #95a5a6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>令和7年分 基礎控除申告書「計算結果貼り付けパーツ」説明書</h1>
+
+    <div class="important">
+        【重要：本ツールの趣旨】<br>
+        本ツールは、配布済みの「給与所得者の基礎控除申告書」の該当箇所に、<strong>計算済みの結果を上から貼り付けるためのパーツ</strong>を作成するものです。手書きによる転記ミスを防ぎ、大量の書類作成を効率化することを目的としています。
+    </div>
+
+    <h2>1. CSV作成時の注意（文字化け対策）</h2>
+    <p>Excelで名簿を作成し、CSV形式で保存する際は以下の点に注意してください。</p>
+    <ul>
+        <li><strong>推奨形式：<code>CSV UTF-8 (コンマ区切り) (*.csv)</code></strong></li>
+        <li><strong>理由：</strong> 通常の <code>CSV (コンマ区切り) (*.csv)</code> （CP932/Shift-JIS）で保存すると、<strong>「ハシゴ高（髙）」</strong>などの環境依存文字が含まれている場合、文字化けが発生し正しく読み込めません。</li>
+        <li>本ツールは読み込み時に文字コードを自動判別しますが、データの正確性を保つためUTF-8での保存を強く推奨します。</li>
+    </ul>
+
+    <h2>2. 計算仕様（令和7年分準拠）</h2>
+    <p>提供された最新資料に基づき、実務に即した以下のロジックで自動計算されます。</p>
+    <table class="logic-table">
+        <tr><th>給与収入（額面）</th><th>所得金額の算出ロジック</th></tr>
+        [span_0](start_span)<tr><td>651,000円未満[span_0](end_span)</td><td><strong>0円</strong>（所得なし）</td></tr>
+        [span_1](start_span)<tr><td>651,000円 〜 1,899,999円[span_1](end_span)</td><td>収入金額 － 650,000円</td></tr>
+        [span_2](start_span)[span_3](start_span)<tr><td>1,900,000円 〜 6,599,999円[span_2](end_span)[span_3](end_span)</td><td><strong>4,000円刻みの端数処理</strong>を適用した実務計算</td></tr>
+        [span_4](start_span)<tr><td>6,600,000円 〜 8,500,000円[span_4](end_span)</td><td>（収入金額 × 90%） － 1,100,000円</td></tr>
+        [span_5](start_span)<tr><td>8,500,000円超 〜 20,000,000円[span_5](end_span)</td><td>収入金額 － 1,950,000円</td></tr>
+        [span_6](start_span)<tr><td>20,000,000円超[span_6](end_span)</td><td><strong>18,050,000円</strong>（上限固定）</td></tr>
+    </table>
+
+    <h2>3. 使い方と印刷</h2>
+    <ol>
+        <li>「テンプレート出力」で雛形を取得し、Excelで名簿を作成（UTF-8推奨）。</li>
+        <li>CSVを読み込むと、8人分の計算結果パーツが自動生成されます。</li>
+        <li>印刷後、枠線に沿って切り取り、元の申告書の計算欄に貼り付けてください。</li>
+    </ol>
+
+    <div class="important" style="background:#fce4ec; border-color:#f06292;">
+        【免責事項】<br>
+        本ツールは、令和7年分の年末調整資料に基づき作成されていますが、計算結果の正確性を公的に保証するものではありません。実務での利用にあたっては、必ず数件のサンプルを元に計算結果の整合性を確認してください。
+    </div>
+
+    <div class="footer">© 2025 年末調整効率化プロジェクト</div>
+</div>
+</body>
+</html>
