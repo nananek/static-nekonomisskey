@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>令和7年分 基礎控除申告書（8人組版・CSV文字コード自動判別）</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/encoding-japanese/2.0.0/encoding.min.js"></script>
+    <style>
+        @page { size: A4; margin: 0; }
+        body { margin: 0; padding: 0; background: #525659; font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; }
+
+        /* 操作パネル（印刷非表示） */
+        .toolbar {
+            position: fixed; top: 0; left: 0; width: 100%; height: 50px;
+            background: #2c3e50; color: white; display: flex; align-items: center;
+            padding: 0 20px; box-sizing: border-box; z-index: 1000; gap: 8px;
+        }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; transition: 0.2s; }
+        .btn:hover { opacity: 0.8; }
+        .btn-template { background: #f39c12; color: white; }
+        .btn-add { background: #27ae60; color: white; }
+        .btn-io { background: #7f8c8d; color: white; }
+        .btn-print { background: #2980b9; color: white; }
+
+        /* A4シート配置（2列x4行 = 8人分） */
+        .page-container { margin-top: 60px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding-bottom: 50px; }
+        .sheet {
+            width: 210mm; height: 297mm; background: white;
+            display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, 1fr);
+            box-sizing: border-box; padding: 5mm; page-break-after: always;
+        }
+
+        .form-container { 
+            border: 0.1mm dashed #bbb; padding: 5mm 6mm; box-sizing: border-box; 
+            display: flex; flex-direction: column; position: relative; justify-content: space-between;
+        }
+        .title { text-align: center; font-weight: bold; font-size: 10pt; margin-bottom: 8px; }
+
+        .delete-btn {
+            position: absolute; top: 3px; right: 3px; width: 20px; height: 20px;
+            background: #e74c3c; color: white; border: none; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; opacity: 0; font-size: 14px;
+        }
+        .form-container:hover .delete-btn { opacity: 1; }
+
+        .header-info { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-end; height: 28px; }
+        .info-group { display: flex; align-items: flex-end; border-bottom: 1.2px solid #000; padding-bottom: 1px; }
+        .label { font-size: 7.5pt; margin-right: 5px; color: #444; white-space: nowrap; }
+        .editable { cursor: pointer; font-weight: bold; min-height: 1.1em; outline: none; }
+        .id-field { min-width: 50px; text-align: center; font-size: 8pt; }
+        .name-field { min-width: 160px; font-size: 12pt; flex-grow: 1; }
+
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { border: 1px solid black; padding: 1px 4px; height: 18px; font-size: 8pt; }
+        .label-bg { background-color: #f8f8f8; font-weight: normal; }
+        .num-val { text-align: right; font-family: "Consolas", monospace; font-weight: bold; }
+
+        .bottom-summary { display: flex; justify-content: space-between; margin-top: 6px; gap: 6px; }
+        .summary-box { flex: 1; border: 1.5px solid black; text-align: center; }
+        .summary-title { background: #f8f8f8; border-bottom: 1px solid black; font-size: 7pt; font-weight: bold; padding: 1px; }
+        .summary-value { height: 32px; display: flex; align-items: center; justify-content: center; font-size: 12pt; font-weight: bold; color: #d32f2f; }
+
+        .edit-input { width: 100%; border: none; background: transparent; font: inherit; text-align: inherit; outline: none; padding: 0; }
+
+        @media print {
+            body { background: none; }
+            .toolbar, .delete-btn { display: none !important; }
+            .page-container { margin-top: 0; padding-bottom: 0; gap: 0; }
+            .sheet { box-shadow: none; margin: 0; border: none; padding: 0; }
+            .form-container { border: 0.1mm solid #eee; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="toolbar">
+    <button class="btn btn-template" onclick="exportCSV(true)">📄 テンプレート(CSV)</button>
+    <button class="btn btn-add" onclick="addBatch(8)">＋ 8人分追加</button>
+    <button class="btn btn-io" onclick="exportCSV(false)">💾 保存(CSV)</button>
+    <button class="btn btn-io" onclick="document.getElementById('importFile').click()">📂 読込(CSV)</button>
+    <input type="file" id="importFile" style="display:none" accept=".csv" onchange="importCSV(event)">
+    <button class="btn btn-print" onclick="window.print()">🖨️ 印刷</button>
+    <div style="font-size:10px; margin-left:10px; opacity:0.8">※自動判別: Shift-JIS / UTF-8(BOM)対応</div>
+</div>
+
+<div class="page-container" id="page-container"></div>
+
+<script>
+    // 判定基準（令和7年分） [cite: 3]
+    const judgeRules = [
+        { min: 0, max: 1320000, cat: "A", amt: "95" },
+        { min: 1320001, max: 3360000, cat: "A", amt: "88" },
+        { min: 3360001, max: 4890000, cat: "A", amt: "68" },
+        { min: 4890001, max: 6550000, cat: "A", amt: "63" },
+        { min: 6550001, max: 9000000, cat: "A", amt: "58" },
+        { min: 9000001, max: 9500000, cat: "B", amt: "58" },
+        { min: 9500001, max: 10000000, cat: "C", amt: "58" },
+        { min: 10000001, max: 23500000, cat: "", amt: "58" },
+        { min: 23500001, max: 24000000, cat: "", amt: "48" },
+        { min: 24000001, max: 24500000, cat: "", amt: "32" },
+        { min: 24500001, max: 25000000, cat: "", amt: "16" }
+    ];
+
+    let personData = Array(8).fill().map(() => ({id:"",name:"",rev:0,oth:0}));
+
+    // 資料(114.pdf)に基づく令和7年分計算ロジック
+    function calcIncome(rev) {
+        if (rev < 651000) return 0; // 651,000円未満は0円 
+        if (rev < 1900000) return rev - 650000; // [cite: 3]
+        
+        // 4,000円刻みの端数処理 
+        if (rev < 6600000) {
+            const target = Math.floor(rev / 4000) * 4000;
+            const r = target < 3600000 ? [0.7, 80000] : [0.8, 440000];
+            return Math.floor(target * r[0] - r[1]);
+        }
+        if (rev <= 8500000) return Math.floor(rev * 0.9 - 1100000); // 
+        if (rev <= 20000000) return Math.floor(rev - 1950000); // 
+        return 18050000; // 2,000万円超固定 
+    }
+
+    function render() {
+        const container = document.getElementById('page-container');
+        container.innerHTML = "";
+        const pageCount = Math.max(1, Math.ceil(personData.length / 8));
+        for (let p = 0; p < pageCount; p++) {
+            const sheet = document.createElement('div'); sheet.className = "sheet";
+            for (let i = 0; i < 8; i++) {
+                const idx = p * 8 + i;
+                sheet.innerHTML += personData[idx] ? createHtml(idx, personData[idx]) : '<div class="form-container" style="border:none"></div>';
+            }
+            container.appendChild(sheet);
+        }
+        personData.forEach((_, idx) => update(idx));
+    }
+
+    function createHtml(idx, p) {
+        return `<div class="form-container"><button class="delete-btn" onclick="del(${idx})">×</button>
+            <div class="title">令和7年分 給与所得者の基礎控除申告書</div>
+            <div class="header-info">
+                <div class="info-group"><span class="label">従業員番号</span><div class="editable id-field" onclick="ed(this,${idx},'id')">${p.id}</div></div>
+                <div class="info-group"><span class="label">氏名</span><div class="editable name-field" onclick="ed(this,${idx},'name')">${p.name}</div></div>
+            </div>
+            <table><tr class="label-bg"><th style="width:40%">所得の種類</th><th style="width:30%">収入金額</th><th style="width:30%">所得金額</th></tr>
+                <tr><td>(1) 給与所得</td><td class="editable num-val" onclick="ed(this,${idx},'rev')">${p.rev.toLocaleString()}</td><td class="auto-calc num-val" id="inc_${idx}">0</td></tr>
+                <tr><td>(2) 給与所得以外</td><td style="background:#eee"></td><td class="editable num-val" onclick="ed(this,${idx},'oth')">${p.oth.toLocaleString()}</td></tr>
+                <tr style="font-weight:bold"><td>合計所得見積額</td><td style="background:#eee"></td><td class="auto-calc num-val" id="tot_${idx}">0</td></tr>
+            </table>
+            <div class="bottom-summary">
+                <div class="summary-box"><div class="summary-title">区分Ⅰ</div><div id="c_${idx}" class="summary-value"></div></div>
+                <div class="summary-box"><div class="summary-title">基礎控除の額</div><div id="a_${idx}" class="summary-value"></div></div>
+            </div></div>`;
+    }
+
+    function ed(el, idx, key) {
+        if (el.querySelector('input')) return;
+        const input = document.createElement('input'); input.className = "edit-input";
+        input.type = (typeof personData[idx][key] === 'number') ? 'number' : 'text';
+        input.value = personData[idx][key]; el.innerHTML = ""; el.appendChild(input); input.focus();
+        if (input.type === 'text') input.select();
+        input.onblur = () => {
+            personData[idx][key] = input.type === 'number' ? (parseInt(input.value) || 0) : input.value;
+            el.innerText = input.type === 'number' ? personData[idx][key].toLocaleString() : personData[idx][key];
+            update(idx);
+        };
+        input.onkeydown = (e) => { if(e.key==='Enter') { input.blur(); focusNext(el); } };
+    }
+
+    function focusNext(el) {
+        const edits = Array.from(document.querySelectorAll('.editable'));
+        const next = edits[edits.indexOf(el) + 1];
+        if (next) next.click();
+    }
+
+    function update(idx) {
+        const p = personData[idx]; const inc = calcIncome(p.rev); const tot = inc + p.oth;
+        const incEl = document.getElementById(`inc_${idx}`); if(incEl) incEl.innerText = inc.toLocaleString();
+        const totEl = document.getElementById(`tot_${idx}`); if(totEl) totEl.innerText = tot.toLocaleString();
+        const rule = judgeRules.find(r => tot >= r.min && tot <= r.max);
+        if (rule) {
+            document.getElementById(`c_${idx}`).innerText = rule.cat || "-";
+            document.getElementById(`a_${idx}`).innerText = rule.amt + "万円";
+        }
+    }
+
+    function exportCSV(isTemplate) {
+        const head = "従業員番号,氏名,給与収入,給与所得以外の合計額\r\n";
+        let body = isTemplate ? "001,国税 太郎,\"5,000,000\",0\r\n" : personData.map(p => `${p.id},${p.name},"${p.rev.toLocaleString()}",${p.oth}`).join('\r\n');
+        const unicodeArray = Encoding.stringToCode(head + body);
+        const sjis = new Uint8Array(Encoding.convert(unicodeArray, { to: 'SJIS', from: 'UNICODE' }));
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([sjis], { type: 'text/csv' }));
+        a.download = isTemplate ? "template.csv" : `tax_data.csv`;
+        a.click();
+    }
+
+    // CSV読込ロジック（BOM判別・Shift-JIS/UTF-8対応）
+    function importCSV(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (f) => {
+            const uint8Array = new Uint8Array(f.target.result);
+            let unicodeStr = "";
+
+            // UTF-8 BOMチェック (EF BB BF)
+            if (uint8Array[0] === 0xEF && uint8Array[1] === 0xBB && uint8Array[2] === 0xBF) {
+                const decoder = new TextDecoder("utf-8");
+                unicodeStr = decoder.decode(uint8Array.slice(3));
+            } else {
+                // BOMがない場合はライブラリで自動判別（主にShift-JIS用）
+                const unicodeArray = Encoding.convert(uint8Array, { to: 'UNICODE', from: 'AUTO' });
+                unicodeStr = Encoding.codeToString(unicodeArray);
+            }
+
+            const lines = unicodeStr.split(/\r\n|\n/).filter(line => line.trim());
+            personData = lines.slice(1).map(line => {
+                const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.replace(/^"|"$/g, '').trim());
+                return { 
+                    id: cols[0] || "", 
+                    name: cols[1] || "", 
+                    rev: parseInt((cols[2] || "0").replace(/,/g, '')) || 0, 
+                    oth: parseInt((cols[3] || "0").replace(/,/g, '')) || 0 
+                };
+            }).filter(p => p.id || p.name);
+            render();
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function addBatch(n) { for(let i=0; i<n; i++) personData.push({id:"",name:"",rev:0,oth:0}); render(); }
+    function del(idx) { personData.splice(idx, 1); render(); }
+    render();
+</script>
+</body>
+</html>
