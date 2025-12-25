@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<meta charset="UTF-8">
+	<title>CSV Diff Visualizer</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+	<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+	<!-- iconv-lite is not needed and causes MIME error, so remove it -->
+	<script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.0.0/encoding.min.js"></script>
+	<style>
+		html, body, #app, .container { height: 100%; min-height: 100vh; }
+		body { font-family: sans-serif; margin: 2em; height: 100vh; min-height: 100vh; }
+		.diff-header-insert { background: #d4edda !important; }
+		.diff-header-delete { background: #f8d7da !important; }
+		.diff-header-replace { background: #fff3cd !important; }
+		.diff-cell-red { background: #ffcccc !important; }
+		.diff-cell-blue { background: #cce0ff !important; }
+		.diff-cell-yellow { background: #fff7cc !important; }
+		.diff-header-diff { background: #b6fcb6 !important; }
+		.key-nav-btn { margin: 0 0.5em; }
+		.csv-table { margin-bottom: 1em; table-layout: fixed; width: 100%; max-height: 70vh; display: block; overflow-y: auto; }
+		.csv-table thead, .csv-table tbody { display: table; width: 100%; table-layout: fixed; }
+		.csv-table th, .csv-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+		.csv-table th.header-col { min-width: 60px; max-width: 120px; width: 1%; }
+		.csv-table th.data-col, .csv-table td.data-col { width: 25%; min-width: 80px; }
+		.step-title { font-weight: bold; font-size: 1.1em; margin-bottom: 0.5em; }
+		.breadcrumb { margin-bottom: 2em; }
+		.header-checkbox { margin-right: 0.5em; }
+	</style>
+</head>
+<body>
+
+<div id="app" class="container">
+	<!-- パンくずリスト -->
+		<nav aria-label="breadcrumb">
+			<ol class="breadcrumb">
+				<li class="breadcrumb-item" :class="{active: step===1}" @click="step=1" style="cursor:pointer">主ファイル選択</li>
+				<li class="breadcrumb-item" :class="{active: step===2}" :aria-current="step===2?'page':null" @click="step>1?step=2:null" style="cursor:pointer">比較元ファイル選択</li>
+				<li class="breadcrumb-item" :class="{active: step===3}" :aria-current="step===3?'page':null" @click="step>2?step=3:null" style="cursor:pointer">主キー存在差分</li>
+				<li class="breadcrumb-item" :class="{active: step===4}" :aria-current="step===4?'page':null" @click="step>3?step=4:null" style="cursor:pointer">ヘッダ比較</li>
+				<li class="breadcrumb-item" :class="{active: step===5}" :aria-current="step===5?'page':null" @click="step>4?step=5:null" style="cursor:pointer">主キーごと比較</li>
+			</ol>
+		</nav>
+
+	<!-- ステップ1: 主ファイル選択 -->
+	<div v-if="step === 1" class="step">
+		<div class="step-title">1. 主ファイルを選択してください</div>
+		<input type="file" class="form-control mb-3" accept=".csv" @change="onMainFileChange">
+		<div v-if="mainHeaders.length">
+			<div class="mb-2">主キー列を左から順に選択:</div>
+			<div class="d-flex flex-row mb-2 align-items-center" style="overflow-x:auto;">
+				<template v-for="(h,idx) in mainHeaders">
+					<div v-if="h.trim()!==''" :key="'slide-'+idx" class="me-2">
+						<button type="button"
+							class="btn btn-outline-primary"
+							:class="{'active': mainKeys.includes(h)}"
+							@click="toggleSlideKey(idx)"
+							:disabled="idx>0 && !mainKeys.includes(mainHeaders[idx-1])"
+						>
+							{{ h }}
+						</button>
+					</div>
+				</template>
+			</div>
+			<button class="btn btn-primary" @click="goStep2" :disabled="mainKeys.length===0">次へ</button>
+		</div>
+	</div>
+
+
+	<!-- ステップ2: 比較元ファイル選択 -->
+	<div v-if="step === 2" class="step">
+		<div class="step-title">2. 比較元ファイルを選択してください</div>
+		<input type="file" class="form-control mb-3" accept=".csv" @change="onCompareFileChange">
+		<div v-if="compareHeaders.length">
+			<button class="btn btn-primary" @click="goStep3">次へ</button>
+		</div>
+		<button class="btn btn-secondary mt-2" @click="step = 1">戻る</button>
+	</div>
+
+	<!-- ステップ3: 主キー存在差分 -->
+	<div v-if="step === 3" class="step">
+		<div class="step-title">3. 一方のみに存在する主キー</div>
+		<div v-if="mainOnlyKeys.length || compareOnlyKeys.length">
+			<div v-if="mainOnlyKeys.length">
+				<b>主ファイルのみに存在:</b>
+				<ul>
+					<li v-for="k in mainOnlyKeys" :key="'main-'+k.join('_')">{{ k.join(' / ') }}</li>
+				</ul>
+			</div>
+			<div v-if="compareOnlyKeys.length">
+				<b>比較元ファイルのみに存在:</b>
+				<ul>
+					<li v-for="k in compareOnlyKeys" :key="'cmp-'+k.join('_')">{{ k.join(' / ') }}</li>
+				</ul>
+			</div>
+		</div>
+		<div v-if="!mainOnlyKeys.length && !compareOnlyKeys.length">両方に存在しない主キーはありません。</div>
+		<button class="btn btn-secondary" @click="step = 2">戻る</button>
+		<button class="btn btn-primary" @click="goStep4">次へ</button>
+	</div>
+
+	<!-- ステップ4: ヘッダ比較 -->
+	<div v-if="step === 4" class="step">
+		<div class="step-title">4. ヘッダの比較</div>
+		<table class="table table-bordered table-sm">
+			<thead class="table-light">
+				<tr><th>主ファイル</th><th>比較元ファイル</th></tr>
+			</thead>
+			<tbody>
+				<tr v-for="(row,idx) in headerDiffRows" :key="idx">
+					<td :class="row[2]">{{ row[0] }}</td>
+					<td :class="row[3]">{{ row[1] }}</td>
+				</tr>
+			</tbody>
+		</table>
+		<button class="btn btn-secondary" @click="step = 3">戻る</button>
+		<button class="btn btn-primary" @click="goStep5">次へ</button>
+	</div>
+
+	<!-- ステップ5: 主キーごと比較 -->
+	<div v-if="step === 5" class="step" tabindex="0" @keydown.left.prevent="prevKey" @keydown.right.prevent="nextKey" @keydown.d.prevent="toggleDiffMode" ref="compareStep">
+		<div class="mb-2">
+			<span class="badge bg-info" v-if="diffMode">差異行のみ表示中 (dキーで解除)</span>
+		</div>
+		<div class="step-title">5. 主キーごとに比較</div>
+		<div class="mb-2 d-flex justify-content-center align-items-center" style="gap:1em;">
+			<button class="btn btn-outline-secondary key-nav-btn" style="min-width:48px;" @click="prevKey" :disabled="currentKeyIndex === 0">←</button>
+			<span style="display:inline-block; min-width:70px; text-align:center;"><b>{{ currentKeyIndex+1 }}/{{ allKeys.length }}</b></span>
+			<button class="btn btn-outline-secondary key-nav-btn" style="min-width:48px;" @click="nextKey" :disabled="currentKeyIndex === allKeys.length-1">→</button>
+		</div>
+		<table class="table table-bordered table-sm csv-table">
+			<tbody>
+				<tr v-for="(h,idx) in filteredHeaders" :key="h">
+					<td :class="headerDiffClass(h)">{{ h }}</td>
+					<td class="data-col" :class="cellClass(h)">{{ formatCell(mainRow[h], compareRow[h]) }}</td>
+					<td class="data-col">{{ formatCell(compareRow[h], mainRow[h], false) }}</td>
+				</tr>
+			</tbody>
+		</table>
+		<button class="btn btn-secondary" @click="step = 4">戻る</button>
+	</div>
+</div>
+
+<script>
+new Vue({
+	el: '#app',
+	data: {
+		step: 1,
+		mainFile: null,
+		compareFile: null,
+		mainHeaders: [],
+		compareHeaders: [],
+		mainKeys: [], // 複数主キー
+		mainData: [],
+		compareData: [],
+		allKeys: [],
+		currentKeyIndex: 0,
+		diffMode: false,
+	},
+	mounted() {
+		// ステップ4で自動フォーカス
+		this.$watch('step', (val) => {
+			if(val===4) this.$nextTick(()=>{
+				if(this.$refs.compareStep) this.$refs.compareStep.focus();
+			});
+		});
+	},
+	computed: {
+		mainOnlyKeys() {
+			// 主ファイルのみに存在する主キー
+			if (!this.mainKeys.length) return [];
+			const mainSet = new Set(this.mainData.map(r => this.mainKeys.map(k => r[k]).join('\u0001')));
+			const cmpSet = new Set(this.compareData.map(r => this.mainKeys.map(k => r[k]).join('\u0001')));
+			return Array.from(mainSet).filter(k => !cmpSet.has(k)).map(k => k.split('\u0001'));
+		},
+		compareOnlyKeys() {
+			// 比較元ファイルのみに存在する主キー
+			if (!this.mainKeys.length) return [];
+			const mainSet = new Set(this.mainData.map(r => this.mainKeys.map(k => r[k]).join('\u0001')));
+			const cmpSet = new Set(this.compareData.map(r => this.mainKeys.map(k => r[k]).join('\u0001')));
+			return Array.from(cmpSet).filter(k => !mainSet.has(k)).map(k => k.split('\u0001'));
+		},
+		filteredHeaders() {
+			// dモード時は主キー列と差異列のみ
+			if (!this.diffMode) return this.mainHeaders.filter(h => h.trim() !== '');
+			const diffCols = this.mainHeaders.filter(h => h.trim()!=='' && this.isDiffCol(h));
+			const keyCols = this.mainKeys;
+			// 主キー列＋差異列（重複除去）
+			return [...new Set([...keyCols, ...diffCols])];
+		},
+		isDiffCol() {
+			// dummy, real is in methods
+			return () => false;
+		},
+		headerDiffRows() {
+			// 空ヘッダ列は無視
+			const main = this.mainHeaders.filter(h => h.trim() !== '');
+			const compare = this.compareHeaders.filter(h => h.trim() !== '');
+			// LCSでdiff
+			function lcs(a, b) {
+				const m = a.length, n = b.length;
+				const dp = Array(m+1).fill().map(()=>Array(n+1).fill(0));
+				for(let i=0;i<m;i++)for(let j=0;j<n;j++)
+					if(a[i]===b[j])dp[i+1][j+1]=dp[i][j]+1;else dp[i+1][j+1]=Math.max(dp[i][j+1],dp[i+1][j]);
+				let i=m,j=n,res=[];
+				while(i>0&&j>0){
+					if(a[i-1]===b[j-1]){res.unshift([a[i-1],b[j-1],'','']);i--;j--;}
+					else if(dp[i][j-1]>=dp[i-1][j]){res.unshift(['',b[j-1],'','diff-header-insert']);j--;}
+					else{res.unshift([a[i-1],'','diff-header-delete','']);i--;}
+				}
+				while(i>0){res.unshift([a[i-1],'','diff-header-delete','']);i--;}
+				while(j>0){res.unshift(['',b[j-1],'','diff-header-insert']);j--;}
+				// 変更（同位置で値違い）をreplace色に
+				for(let k=0;k<res.length;k++){
+					if(res[k][0]&&res[k][1]&&res[k][0]!==res[k][1]){
+						res[k][2]='diff-header-replace';res[k][3]='diff-header-replace';
+					}
+				}
+				return res;
+			}
+			return lcs(main, compare);
+		},
+		currentKey() {
+			return this.allKeys[this.currentKeyIndex] || [];
+		},
+		currentKeyDisplay() {
+			return Array.isArray(this.currentKey) ? this.currentKey.join(' / ') : this.currentKey;
+		},
+		mainRow() {
+			if (!this.mainKeys.length) return {};
+			return this.mainData.find(r => this.keyMatch(r, this.currentKey)) || {};
+		},
+		compareRow() {
+			if (!this.mainKeys.length) return {};
+			return this.compareData.find(r => this.keyMatch(r, this.currentKey)) || {};
+		},
+	},
+	methods: {
+		toggleSlideKey(idx) {
+			// スライド式主キー選択: 先頭から右に連続選択のみ許可
+			if (this.mainKeys.length === idx && (idx === 0 || this.mainKeys.includes(this.mainHeaders[idx-1]))) {
+				// 右端に追加
+				this.mainKeys.push(this.mainHeaders[idx]);
+			} else if (this.mainKeys.length-1 === idx) {
+				// 右端を外す
+				this.mainKeys.pop();
+			}
+		},
+		onMainFileChange(e) {
+			const file = e.target.files[0];
+			if (!file) return;
+			this.readCsvFile(file, (headers, data) => {
+				this.mainHeaders = headers.filter(h => h.trim() !== '');
+				this.mainData = data;
+				this.mainKeys = [];
+			});
+		},
+		onCompareFileChange(e) {
+			const file = e.target.files[0];
+			e.target.value = '';
+			if (!file) return;
+			this.readCsvFile(file, (headers, data) => {
+				this.compareHeaders = headers.filter(h => h.trim() !== '');
+				this.compareData = data;
+			});
+		},
+		goStep2() {
+			this.step = 2;
+		},
+		goStep3() {
+			this.step = 3;
+		},
+		goStep4() {
+			this.step = 4;
+		},
+		goStep5() {
+			// 主キー一覧を作成（主ファイル基準、複数主キー対応）
+			this.allKeys = this.mainData.map(r => this.mainKeys.map(k => r[k]));
+			this.currentKeyIndex = 0;
+			this.step = 5;
+		},
+		prevKey() {
+			if (this.currentKeyIndex > 0) this.currentKeyIndex--;
+		},
+		nextKey() {
+			if (this.currentKeyIndex < this.allKeys.length-1) this.currentKeyIndex++;
+		},
+		keyMatch(row, keyArr) {
+			if (!Array.isArray(keyArr)) return false;
+			return this.mainKeys.every((k, i) => (row[k]||'') === (keyArr[i]||''));
+		},
+		cellClass(h) {
+			// 差分色付け
+			const mainVal = this.mainRow[h];
+			const compareVal = this.compareRow[h];
+			if (mainVal == null && compareVal == null) return '';
+			if (mainVal === compareVal) return '';
+			if (this.isNumber(mainVal) && this.isNumber(compareVal)) {
+				const m = parseFloat(mainVal.replace(/,/g, ''));
+				const c = parseFloat(compareVal.replace(/,/g, ''));
+				if (isNaN(m) || isNaN(c)) return 'diff-cell-yellow';
+				if (m > c) return 'diff-cell-red';
+				if (m < c) return 'diff-cell-blue';
+				return '';
+			}
+			return 'diff-cell-yellow';
+		},
+		headerDiffClass(h) {
+			// 差異のある列のヘッダを緑
+			const mainVal = this.mainRow[h];
+			const compareVal = this.compareRow[h];
+			if (mainVal == null && compareVal == null) return '';
+			if (mainVal === compareVal) return '';
+			return 'diff-header-diff';
+		},
+		isDiffCol(h) {
+			// 主ファイルと比較元で差異がある列
+			const mainVal = this.mainRow[h];
+			const compareVal = this.compareRow[h];
+			if (mainVal == null && compareVal == null) return false;
+			return mainVal !== compareVal;
+		},
+		toggleDiffMode() {
+			this.diffMode = !this.diffMode;
+		},
+		formatCell(val, otherVal, main=true) {
+			if (val == null) return '';
+			if (this.isNumber(val)) {
+				// カンマ区切り
+				const num = parseFloat(val.toString().replace(/,/g, ''));
+				if (isNaN(num)) return val;
+				return num.toLocaleString('ja-JP');
+			}
+			return val;
+		},
+		isNumber(val) {
+			if (val == null) return false;
+			return /^-?\d+(\.\d+)?(e[+-]?\d+)?$/.test(val.toString().replace(/,/g, ''));
+		},
+		readCsvFile(file, callback) {
+			// CP932→UTF-8変換してパース
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				// ArrayBuffer→Uint8Array
+				const codes = new Uint8Array(e.target.result);
+				// CP932→UTF-8文字列
+				const utf8str = Encoding.convert(codes, {to:'UNICODE', from:'SJIS', type:'string'});
+				// CSVパース
+				Papa.parse(utf8str, {
+					header: true,
+					skipEmptyLines: true,
+					complete: (results) => {
+						callback(results.meta.fields.filter(h => h.trim() !== ''), results.data);
+					}
+				});
+			};
+			reader.readAsArrayBuffer(file);
+		},
+	}
+});
+</script>
+
+</body>
+</html>
