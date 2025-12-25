@@ -143,13 +143,13 @@ new Vue({
     },
     formulaParts() {
       const parts = [];
+      if (this.kinro) parts.push('勤学 27万');
+      if (this.kafuHitori === 'kafu') parts.push('寡婦 27万');
+      if (this.kafuHitori === 'hitoriOya') parts.push('ひ親 35万');
       if (this.numFuyo) parts.push(`扶養${this.numFuyo} x 38万`);
       if (this.tokubetsu) parts.push(`同特障${this.tokubetsu} x 75万`);
       if (this.tokubetsuIjo) parts.push(`特障${this.tokubetsuIjo} x 40万`);
       if (this.ippan) parts.push(`一障${this.ippan} x 27万`);
-      if (this.kinro) parts.push('勤学 27万');
-      if (this.kafuHitori === 'kafu') parts.push('寡婦 27万');
-      if (this.kafuHitori === 'hitoriOya') parts.push('ひ親 35万');
       if (this.roujinDoukyo) parts.push(`同老${this.roujinDoukyo} x 20万`);
       if (this.tokuteiFuyo) parts.push(`特扶${this.tokuteiFuyo} x 25万`);
       if (this.roujinIjo) parts.push(`同外老${this.roujinIjo} x 10万`);
