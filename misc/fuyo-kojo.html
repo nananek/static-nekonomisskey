@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>扶養控除額計算フォーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    .result { font-size: 1.3em; font-weight: bold; margin-top: 1em; }
+    .section-title { font-weight: bold; margin-top: 1.5em; }
+  </style>
+</head>
+<body>
+<div id="app" class="container">
+  <h2>扶養控除額計算フォーム</h2>
+  <div class="section-title">① 控除対象扶養親族の人数</div>
+  <div class="mb-3 row align-items-center">
+    <label for="numFuyo" class="col-sm-4 col-form-label">人数:</label>
+    <div class="col-sm-4">
+      <div class="input-group input-group-lg">
+        <button class="btn btn-outline-secondary" type="button" @click="numFuyo = Math.max(0, numFuyo-1)">-</button>
+        <input type="number" min="0" step="1" v-model.number="numFuyo" id="numFuyo" class="form-control text-center" style="font-size:1.5em;" placeholder="0">
+        <button class="btn btn-outline-secondary" type="button" @click="numFuyo = (numFuyo||0)+1">+</button>
+      </div>
+    </div>
+    <div class="col-sm-4 text-muted">1人につき38万円</div>
+  </div>
+  <div class="section-title">② 障害者等の加算額</div>
+  <div class="mb-3 row g-2 align-items-center">
+    <label class="col-sm-6 col-form-label">寡婦・ひとり親</label>
+    <div class="col-sm-6 d-flex align-items-center">
+      <div class="btn-group w-100" role="group" aria-label="寡婦・ひとり親">
+        <input type="radio" class="btn-check" id="none" value="none" v-model="kafuHitori" autocomplete="off">
+        <label class="btn btn-outline-primary" for="none" style="min-width:90px;">該当なし</label>
+        <input type="radio" class="btn-check" id="kafu" value="kafu" v-model="kafuHitori" autocomplete="off">
+        <label class="btn btn-outline-primary" for="kafu" style="min-width:110px;">寡婦（27万円）</label>
+        <input type="radio" class="btn-check" id="hitoriOya" value="hitoriOya" v-model="kafuHitori" autocomplete="off">
+        <label class="btn btn-outline-primary" for="hitoriOya" style="min-width:120px;">ひとり親（35万円）</label>
+      </div>
+    </div>
+    <label for="tokubetsu" class="col-sm-6 col-form-label">同居特別障害者がいる</label>
+    <div class="col-sm-2">
+      <div class="input-group input-group-lg">
+        <button class="btn btn-outline-secondary" type="button" @click="tokubetsu = Math.max(0, tokubetsu-1)">-</button>
+        <input type="number" min="0" v-model.number="tokubetsu" id="tokubetsu" class="form-control text-center" style="font-size:1.2em;" placeholder="0">
+        <button class="btn btn-outline-secondary" type="button" @click="tokubetsu = (tokubetsu||0)+1">+</button>
+      </div>
+    </div>
+    <div class="col-sm-4 text-muted">1人につき75万円</div>
+    <label for="tokubetsuIjo" class="col-sm-6 col-form-label">同居特別障害者以外の特別障害者</label>
+    <div class="col-sm-2">
+      <div class="input-group input-group-lg">
+        <button class="btn btn-outline-secondary" type="button" @click="tokubetsuIjo = Math.max(0, tokubetsuIjo-1)">-</button>
+        <input type="number" min="0" v-model.number="tokubetsuIjo" id="tokubetsuIjo" class="form-control text-center" style="font-size:1.2em;" placeholder="0">
+        <button class="btn btn-outline-secondary" type="button" @click="tokubetsuIjo = (tokubetsuIjo||0)+1">+</button>
+      </div>
+    </div>
+    <div class="col-sm-4 text-muted">1人につき40万円</div>
+    <label for="ippan" class="col-sm-6 col-form-label">一般の障害者</label>
+    <div class="col-sm-2">
+      <div class="input-group input-group-lg">
+        <button class="btn btn-outline-secondary" type="button" @click="ippan = Math.max(0, ippan-1)">-</button>
+        <input type="number" min="0" v-model.number="ippan" id="ippan" class="form-control text-center" style="font-size:1.2em;" placeholder="0">
+        <button class="btn btn-outline-secondary" type="button" @click="ippan = (ippan||0)+1">+</button>
+      </div>
+    </div>
+    <div class="col-sm-4 text-muted">1人につき27万円</div>
+    <label for="roujinDoukyo" class="col-sm-6 col-form-label">同居老親等</label>
+    <div class="col-sm-2">
+      <div class="input-group input-group-lg">
+        <button class="btn btn-outline-secondary" type="button" @click="roujinDoukyo = Math.max(0, roujinDoukyo-1)">-</button>
+        <input type="number" min="0" v-model.number="roujinDoukyo" id="roujinDoukyo" class="form-control text-center" style="font-size:1.2em;" placeholder="0">
+        <button class="btn btn-outline-secondary" type="button" @click="roujinDoukyo = (roujinDoukyo||0)+1">+</button>
+      </div>
+    </div>
+    <div class="col-sm-4 text-muted">1人につき20万円</div>
+    <label for="tokuteiFuyo" class="col-sm-6 col-form-label">特定扶養親族</label>
+    <div class="col-sm-2">
+      <div class="input-group input-group-lg">
+        <button class="btn btn-outline-secondary" type="button" @click="tokuteiFuyo = Math.max(0, tokuteiFuyo-1)">-</button>
+        <input type="number" min="0" v-model.number="tokuteiFuyo" id="tokuteiFuyo" class="form-control text-center" style="font-size:1.2em;" placeholder="0">
+        <button class="btn btn-outline-secondary" type="button" @click="tokuteiFuyo = (tokuteiFuyo||0)+1">+</button>
+      </div>
+    </div>
+    <div class="col-sm-4 text-muted">1人につき25万円</div>
+    <label for="roujinIjo" class="col-sm-6 col-form-label">同居老親等以外の老人扶養親族</label>
+    <div class="col-sm-2">
+      <div class="input-group input-group-lg">
+        <button class="btn btn-outline-secondary" type="button" @click="roujinIjo = Math.max(0, roujinIjo-1)">-</button>
+        <input type="number" min="0" v-model.number="roujinIjo" id="roujinIjo" class="form-control text-center" style="font-size:1.2em;" placeholder="0">
+        <button class="btn btn-outline-secondary" type="button" @click="roujinIjo = (roujinIjo||0)+1">+</button>
+      </div>
+    </div>
+    <div class="col-sm-4 text-muted">1人につき10万円</div>
+    <label class="col-sm-6 col-form-label">勤労学生控除（本人）</label>
+    <div class="col-sm-2 d-flex align-items-center">
+      <div class="form-check form-switch">
+        <input type="checkbox" v-model="kinro" id="kinro" class="form-check-input" style="transform:scale(1.5);">
+      </div>
+    </div>
+    <div class="col-sm-4 text-muted">27万円</div>
+    </div>
+  <div class="result">
+    控除額合計: <span>{{ total.toLocaleString('ja-JP') }}</span> 円
+    <div class="text-secondary mt-2" v-if="formulaParts.length">
+      <span>{{ formulaParts.join(' + ') }} = {{ totalMan }}万円</span>
+    </div>
+  </div>
+</div>
+<script>
+new Vue({
+  el: '#app',
+  data: {
+    numFuyo: 0,
+    tokubetsu: false,
+    tokubetsuIjo: 0,
+    ippan: 0,
+    kafuHitori: 'none',
+    kinro: false,
+    roujinDoukyo: 0,
+    tokuteiFuyo: 0,
+    roujinIjo: 0,
+  },
+  computed: {
+    fuyoBase() {
+      // 1人につき38万円
+      return (this.numFuyo || 0) * 380000;
+    },
+    total() {
+      let sum = this.fuyoBase;
+      sum += (this.tokubetsu||0) * 750000;
+      sum += (this.tokubetsuIjo||0) * 400000;
+      sum += (this.ippan||0) * 270000;
+      if (this.kinro) sum += 270000;
+      if (this.kafuHitori === 'kafu') sum += 270000;
+      if (this.kafuHitori === 'hitoriOya') sum += 350000;
+      sum += (this.roujinDoukyo||0) * 200000;
+      sum += (this.tokuteiFuyo||0) * 250000;
+      sum += (this.roujinIjo||0) * 100000;
+      return sum;
+    },
+    formulaParts() {
+      const parts = [];
+      if (this.numFuyo) parts.push(`扶養${this.numFuyo} x 38万`);
+      if (this.tokubetsu) parts.push(`同特障${this.tokubetsu} x 75万`);
+      if (this.tokubetsuIjo) parts.push(`特障${this.tokubetsuIjo} x 40万`);
+      if (this.ippan) parts.push(`一障${this.ippan} x 27万`);
+      if (this.kinro) parts.push('勤学 27万');
+      if (this.kafuHitori === 'kafu') parts.push('寡婦 27万');
+      if (this.kafuHitori === 'hitoriOya') parts.push('ひ親 35万');
+      if (this.roujinDoukyo) parts.push(`同老${this.roujinDoukyo} x 20万`);
+      if (this.tokuteiFuyo) parts.push(`特扶${this.tokuteiFuyo} x 25万`);
+      if (this.roujinIjo) parts.push(`同外老${this.roujinIjo} x 10万`);
+      return parts;
+    },
+    totalMan() {
+      return Math.round(this.total/10000);
+    }
+  }
+});
+</script>
+</body>
+</html>
