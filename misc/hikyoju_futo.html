@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>非居住者扶養判定ツール</title>
+    <style>
+        body { font-family: "Helvetica Neue", Arial, sans-serif; background-color: #f4f7f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header-area { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; }
+        .settings-row { display: flex; align-items: center; gap: 20px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        
+        button { cursor: pointer; border: none; border-radius: 4px; padding: 10px 20px; font-weight: bold; font-size: 0.9rem; transition: 0.2s; }
+        .btn-add { background: #34a853; color: white; }
+        .btn-step-next { background: #1a73e8; color: white; }
+        .btn-step-back { background: #6c757d; color: white; display: none; margin-right: 5px; }
+        .btn-step-orange { background: #f39c12; color: white; display: none; }
+        .btn-reset { background: #e0e0e0; color: #333; font-size: 0.8rem; padding: 5px 10px; }
+        
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        th { background: #e8eaed; padding: 12px; font-size: 0.85rem; text-align: left; border-bottom: 2px solid #dee2e6; }
+        td { padding: 8px 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
+
+        input { padding: 8px; border: 1px solid #dadce0; border-radius: 4px; box-sizing: border-box; outline: none; }
+        input:focus { border-color: #1a73e8; background-color: #f0f7ff; }
+        .input-name { width: 180px; }
+        
+        .era-flex-container { display: flex; gap: 5px; align-items: center; }
+        .era-input-wrapper { position: relative; display: inline-block; }
+        .input-era-code { width: 45px; text-align: center; font-weight: bold; background: #fffde7; border: 2px solid #fbc02d; text-transform: uppercase; }
+        
+        .cheat-sheet {
+            visibility: hidden; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+            background-color: #333; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 0.75rem;
+            white-space: nowrap; z-index: 1000; opacity: 0; transition: opacity 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); pointer-events: none;
+        }
+        .cheat-sheet::after {
+            content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px; border-width: 6px; border-style: solid; border-color: #333 transparent transparent transparent;
+        }
+        .input-era-code:focus + .cheat-sheet { visibility: visible; opacity: 1; }
+
+        .input-num { width: 55px; text-align: center; }
+        .amt-input { width: 130px; text-align: right; font-family: monospace; font-size: 1rem; }
+        
+        .step2-col, .step3-col { display: none; }
+        .visible { display: table-cell !important; }
+
+        .result-badge { padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; display: inline-block; }
+        .ok { background: #e6f4ea; color: #1e8e3e; border: 1px solid #1e8e3e; }
+        .child { background: #e8f0fe; color: #1967d2; border: 1px solid #1967d2; }
+        .ng { background: #fce8e6; color: #d93025; border: 1px solid #d93025; }
+        .finished-row { background-color: #f8f9fa; }
+        
+        .era-label { font-size: 0.75rem; color: #777; width: 35px; display: inline-block; font-weight: bold; }
+        .warning-11 { color: #d93025; font-size: 0.7rem; font-weight: bold; display: block; margin-top: 2px; }
+        .hint { font-size: 0.8rem; color: #666; margin-left: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-area">
+        <div class="settings-row">
+            <div>
+                <label style="font-weight:bold;">【判定対象年度】</label>
+                <input type="number" id="globalTargetYear" value="2025" style="width:80px; font-size:1.1rem; border:2px solid #1a73e8; text-align:center;" onchange="updateAllRows()">
+            </div>
+            <div id="step-label" style="font-weight:bold; color:#1a73e8; font-size:1.1rem;">Step 1: 戸籍情報の入力</div>
+            <div style="flex-grow: 1; text-align: right;">
+                <button class="btn-reset" onclick="if(confirm('全てのデータを消去しますか？')) location.reload()">リストをリセット</button>
+            </div>
+        </div>
+        <div class="controls">
+            <button id="add-btn" class="btn-add" onclick="addNewRow()">+ 対象者を追加</button>
+            <button id="back-btn" class="btn-step-back" onclick="goBack()">← 戻る</button>
+            <button id="step2-btn" class="btn-step-next" onclick="goToStep2()">ステップ2へ（送金額入力）</button>
+            <button id="step3-btn" class="btn-step-orange" onclick="goToStep3()">ステップ3へ（障害者確認）</button>
+            <span class="hint" id="operation-hint">名前・日付を入力して Enter/Tab で次へ。</span>
+        </div>
+    </div>
+
+    <table id="targetTable">
+        <thead>
+            <tr>
+                <th>氏名（戸籍）</th>
+                <th>生年月日（元号/年/月/日）</th>
+                <th class="step2-col">送金額(合計)</th>
+                <th class="step3-col">障害者</th>
+                <th>判定結果・理由</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    let rowSerial = 0;
+    let currentStep = 1;
+    const eraMap = { 'R': '令和', 'H': '平成', 'S': '昭和', 'T': '大正', 'A': '西暦' };
+
+    function addNewRow() {
+        if (currentStep !== 1) return;
+        rowSerial++;
+        const tbody = document.getElementById('tableBody');
+        const tr = document.createElement('tr');
+        tr.id = `row-${rowSerial}`;
+        tr.setAttribute('data-id', rowSerial);
+        
+        tr.innerHTML = `
+            <td><input type="text" id="name-${rowSerial}" class="input-name" placeholder="氏名" onkeydown="handleNav(event, ${rowSerial}, 'name')"></td>
+            <td>
+                <div class="era-flex-container">
+                    <div class="era-input-wrapper">
+                        <input type="text" id="era-${rowSerial}" class="input-era-code" maxlength="1" value="A" 
+                               onkeydown="handleEraKeyDown(event, ${rowSerial})">
+                        <div class="cheat-sheet">R:令和 / H:平成 / S:昭和 / T:大正 / A:西暦</div>
+                    </div>
+                    <span id="era-name-${rowSerial}" class="era-label">AD</span>
+                    <input type="text" id="y-${rowSerial}" class="input-num" placeholder="年" maxlength="4"
+                           oninput="filterNum(this); checkLogic(${rowSerial})" onkeydown="handleNav(event, ${rowSerial}, 'y')">
+                    <input type="text" id="m-${rowSerial}" class="input-num" placeholder="月" maxlength="2"
+                           oninput="filterNum(this); checkLogic(${rowSerial})" onkeydown="handleNav(event, ${rowSerial}, 'm')">
+                    <input type="text" id="d-${rowSerial}" class="input-num" placeholder="日" maxlength="2"
+                           oninput="filterNum(this); checkLogic(${rowSerial})" onkeydown="handleNav(event, ${rowSerial}, 'd')">
+                </div>
+                <span id="warn-11-${rowSerial}" class="warning-11" style="display:none;">※1/1生: 年齢加算済</span>
+            </td>
+            <td class="step2-col"><input type="text" id="amt-${rowSerial}" class="amt-input" placeholder="0" oninput="filterNum(this); formatCurrency(this); checkLogic(${rowSerial})" onkeydown="handleNav(event, ${rowSerial}, 'amt')"></td>
+            <td class="step3-col"><input type="checkbox" id="dis-${rowSerial}" onchange="checkLogic(${rowSerial})"> 障害あり</td>
+            <td><span id="badge-${rowSerial}" class="result-badge" style="display:none;"></span> <span id="reason-${rowSerial}" style="font-size:0.75rem; color:#666;"></span></td>
+        `;
+        tbody.appendChild(tr);
+        document.getElementById(`name-${rowSerial}`).focus();
+    }
+
+    function goToStep2() {
+        const rows = document.querySelectorAll('#tableBody tr');
+        if (rows.length > 1) {
+            const lastRow = rows[rows.length - 1];
+            if (!document.getElementById(`name-${lastRow.getAttribute('data-id')}`).value.trim()) lastRow.remove();
+        }
+        currentStep = 2;
+        updateUI();
+    }
+
+    function goToStep3() {
+        currentStep = 3;
+        updateUI();
+    }
+
+    function goBack() {
+        if (currentStep === 2) currentStep = 1;
+        else if (currentStep === 3) currentStep = 2;
+        updateUI();
+    }
+
+    function updateUI() {
+        const label = document.getElementById('step-label');
+        const hint = document.getElementById('operation-hint');
+        const addBtn = document.getElementById('add-btn');
+        const backBtn = document.getElementById('back-btn');
+        const s2Btn = document.getElementById('step2-btn');
+        const s3Btn = document.getElementById('step3-btn');
+
+        document.querySelectorAll('.step2-col, .step3-col').forEach(el => el.classList.remove('visible'));
+        addBtn.style.display = "none";
+        backBtn.style.display = "inline-block";
+        s2Btn.style.display = "none";
+        s3Btn.style.display = "none";
+
+        if (currentStep === 1) {
+            label.innerText = "Step 1: 戸籍情報の入力";
+            hint.innerText = "名前・日付を入力して Enter/Tab で次へ。";
+            addBtn.style.display = "inline-block";
+            backBtn.style.display = "none";
+            s2Btn.style.display = "inline-block";
+        } else if (currentStep === 2) {
+            label.innerText = "Step 2: 送金額の入力";
+            hint.innerText = "送金額を入力してください。";
+            document.querySelectorAll('.step2-col').forEach(el => el.classList.add('visible'));
+            s3Btn.style.display = "inline-block";
+        } else if (currentStep === 3) {
+            label.innerText = "Step 3: 障害者の確認";
+            hint.innerText = "障害者控除の申告がある場合はチェックを入れてください。";
+            document.querySelectorAll('.step2-col, .step3-col').forEach(el => el.classList.add('visible'));
+        }
+        updateAllRows();
+    }
+
+    function handleEraKeyDown(e, id) {
+        const key = e.key.toUpperCase();
+        if (['TAB', 'ENTER', 'BACKSPACE'].includes(key)) { handleNav(e, id, 'era'); return; }
+        if (eraMap[key]) {
+            e.preventDefault();
+            document.getElementById(`era-${id}`).value = key;
+            document.getElementById(`era-name-${id}`).innerText = eraMap[key];
+            document.getElementById(`y-${id}`).focus();
+            checkLogic(id);
+        } else { e.preventDefault(); }
+    }
+
+    function filterNum(input) { input.value = input.value.replace(/[^0-9]/g, ''); }
+    function formatCurrency(input) {
+        let val = input.value.replace(/,/g, '');
+        if (val && !isNaN(val)) input.value = Number(val).toLocaleString();
+    }
+
+    function handleNav(e, id, type) {
+        if (e.key !== 'Enter' && e.key !== 'Tab') return;
+        if (e.shiftKey && e.key === 'Tab') return;
+        const isLast = (document.getElementById(`row-${id}`).nextElementSibling === null);
+        if (currentStep === 1 && type === 'd') {
+            if (isLast) { e.preventDefault(); addNewRow(); }
+            else if (e.key === 'Enter') { e.preventDefault(); document.getElementById(`row-${id}`).nextElementSibling.querySelector('.input-name').focus(); }
+            return;
+        }
+        if (currentStep === 2 && type === 'amt' && !isLast && e.key === 'Enter') {
+            e.preventDefault(); document.getElementById(`row-${id}`).nextElementSibling.querySelector('.amt-input').focus();
+        }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (type === 'name') document.getElementById(`era-${id}`).focus();
+            else if (type === 'era') document.getElementById(`y-${id}`).focus();
+            else if (type === 'y') document.getElementById(`m-${id}`).focus();
+            else if (type === 'm') document.getElementById(`d-${id}`).focus();
+        }
+    }
+
+    function checkLogic(id) {
+        const targetYear = parseInt(document.getElementById('globalTargetYear').value) || 2025;
+        const eraCode = document.getElementById(`era-${id}`).value.toUpperCase();
+        const y = parseInt(document.getElementById(`y-${id}`).value);
+        const m = parseInt(document.getElementById(`m-${id}`).value);
+        const d = parseInt(document.getElementById(`d-${id}`).value);
+        const amt = parseInt(document.getElementById(`amt-${id}`).value.replace(/,/g, '')) || 0;
+        const isDis = document.getElementById(`dis-${id}`).checked;
+
+        if (isNaN(y) || isNaN(m) || isNaN(d)) return;
+
+        let birthYear = y;
+        if (eraCode === 'R') birthYear += 2018;
+        else if (eraCode === 'H') birthYear += 1988;
+        else if (eraCode === 'S') birthYear += 1925;
+        else if (eraCode === 'T') birthYear += 1911;
+        else if (eraCode === 'A') birthYear = y;
+
+        let age = targetYear - birthYear;
+        if (m === 1 && d === 1) { age += 1; document.getElementById(`warn-11-${id}`).style.display = 'block'; }
+        else { document.getElementById(`warn-11-${id}`).style.display = 'none'; }
+
+        if (currentStep === 1) {
+            setFinalStatus(id, null, `（${targetYear}年末：${age}歳）`);
+            return;
+        }
+
+        if (age < 16) {
+            if (amt > 0) setResult(id, "child", "年少扶養 OK", `${age}歳・送金あり（控除額0円）`);
+            else setResult(id, false, "対象外", "16歳未満・送金なし");
+        } else if (age < 30 || age >= 70) {
+            if (amt > 0) setResult(id, true, "扶養 OK", `${age}歳・送金あり（控除対象）`);
+            else setResult(id, false, "対象外", `${age}歳・送金なし`);
+        } else {
+            if (amt >= 380000) setResult(id, true, "扶養 OK", `38万円送金によりOK`);
+            else if (currentStep === 3 && isDis) setResult(id, true, "扶養 OK", "障害者要件によりOK");
+            else if (currentStep === 3 && amt > 0) setResult(id, false, "対象外", `${age}歳・要件未達成`);
+            else setFinalStatus(id, null, `${age}歳・送金38万未満（障害者確認へ）`);
+        }
+    }
+
+    function updateAllRows() { document.querySelectorAll('#tableBody tr').forEach(tr => checkLogic(tr.getAttribute('data-id'))); }
+
+    function setResult(id, status, badgeText, reasonText) {
+        const badge = document.getElementById(`badge-${id}`);
+        badge.style.display = 'inline-block';
+        badge.innerText = badgeText;
+        badge.className = `result-badge ${status === true ? 'ok' : (status === 'child' ? 'child' : 'ng')}`;
+        document.getElementById(`reason-${id}`).innerText = reasonText;
+        if (status === true || status === 'child') document.getElementById(`row-${id}`).classList.add('finished-row');
+        else document.getElementById(`row-${id}`).classList.remove('finished-row');
+    }
+
+    function setFinalStatus(id, status, text = "") {
+        if (status === null) {
+            document.getElementById(`badge-${id}`).style.display = 'none';
+            document.getElementById(`reason-${id}`).innerText = text;
+            document.getElementById(`row-${id}`).classList.remove('finished-row');
+        }
+    }
+
+    window.onload = addNewRow;
+</script>
+
+</body>
+</html>
