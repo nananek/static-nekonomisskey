@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>封筒宛名印刷（縦置き・横書き対応）</title>
+    <title>封筒宛名印刷（在中スタンプ位置調整版）</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
@@ -10,7 +10,6 @@
     <style>
         body { font-family: 'Noto Serif JP', serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
         
-        /* 設定エリア */
         .no-print { 
             font-family: sans-serif;
             background: white; padding: 20px; border-radius: 8px; 
@@ -28,7 +27,6 @@
         button { padding: 8px 15px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
         .print-btn { background: #e74c3c; color: white; margin-left: auto; }
 
-        /* 印刷設定：縦置き (Portrait) */
         @media print {
             .no-print { display: none; }
             body { background: white; padding: 0; }
@@ -39,7 +37,6 @@
             }
         }
 
-        /* 封筒本体（縦長） */
         .envelope {
             background: white;
             position: relative;
@@ -51,52 +48,66 @@
             box-sizing: border-box;
         }
 
-        /* 長形3号（縦置き） */
         .size-cho3 { width: 120mm; height: 235mm; }
-        /* 角形2号（縦置き） */
         .size-kaku2 { width: 240mm; height: 332mm; }
 
-        /* ブラウザへの用紙サイズ指示 */
         @page { margin: 0; }
         .print-cho3 { size: 120mm 235mm; }
         .print-kaku2 { size: 240mm 332mm; }
 
-        /* レイアウト（縦置き状態での横書き） */
+        /* 郵便番号 */
         .zip-code { position: absolute; font-weight: 700; letter-spacing: 5px; }
         .size-cho3 .zip-code { top: 15mm; left: 15mm; font-size: 16pt; }
         .size-kaku2 .zip-code { top: 25mm; left: 25mm; font-size: 22pt; }
 
+        /* 住所 */
         .address-box { position: absolute; line-height: 1.6; word-break: break-all; }
         .size-cho3 .address-box { top: 45mm; left: 15mm; width: 90mm; font-size: 13pt; }
         .size-kaku2 .address-box { top: 70mm; left: 25mm; width: 190mm; font-size: 18pt; }
 
-        .name-box { position: absolute; width: 100%; text-align: center; }
-        .size-cho3 .name-box { top: 110mm; left: 0; }
-        .size-kaku2 .name-box { top: 170mm; left: 0; }
+        /* 名前ブロックのコンテナ（中央寄せ用） */
+        .name-container {
+            position: absolute;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+        .size-cho3 .name-container { top: 110mm; }
+        .size-kaku2 .name-container { top: 170mm; }
+
+        /* 名前グループ本体（相対配置の基準） */
+        .name-group-inner {
+            display: inline-block;
+            text-align: left;
+            position: relative; /* スタンプの配置基準にする */
+            padding-bottom: 10mm; /* スタンプ用のスペースを確保 */
+        }
         
-        .company-row { font-size: 0.9em; margin-bottom: 3mm; }
-        .name-row { font-weight: 700; display: inline-flex; align-items: baseline; gap: 8px; border-bottom: 0px solid #000; }
+        .company-row { font-size: 0.9em; margin-bottom: 3mm; white-space: nowrap; }
+        .name-row { font-weight: 700; display: flex; align-items: baseline; white-space: nowrap; }
         
-        /* フォントサイズを「シール風」に統一 */
         .size-cho3 .company-row { font-size: 12pt; }
         .size-cho3 .name-row { font-size: 18pt; }
         .size-kaku2 .company-row { font-size: 16pt; }
         .size-kaku2 .name-row { font-size: 26pt; }
 
-        .title-sub { font-size: 0.7em; font-weight: 400; margin-right: 4px; }
-        .hon-sub { font-size: 0.8em; font-weight: 400; margin-left: 4px; }
+        .title-sub { font-size: 0.65em; font-weight: 400; margin-right: 0.5em; }
+        .hon-sub { font-size: 0.8em; font-weight: 400; margin-left: 0.5em; }
 
-        /* 右下の添え書き */
+        /* 添え書きスタンプ（名前ブロックの右下に寄せる） */
         .stamp-box {
             position: absolute;
+            bottom: -5mm;   /* 名前ブロックの下端からの距離 */
+            right: -2mm;    /* 名前ブロックの右端からの距離（少し外側に寄せる） */
             font-weight: 700;
             border: 2px solid;
             border-radius: 6px;
-            padding: 4px 10px;
+            padding: 2px 8px;
             white-space: nowrap;
         }
-        .size-cho3 .stamp-box { bottom: 20mm; right: 10mm; font-size: 12pt; }
-        .size-kaku2 .stamp-box { bottom: 30mm; right: 20mm; font-size: 16pt; }
+        .size-cho3 .stamp-box { font-size: 11pt; }
+        .size-kaku2 .stamp-box { font-size: 15pt; }
+        
         .stamp-blue { color: #003399; border-color: #003399; }
         .stamp-red { color: #cc0000; border-color: #cc0000; }
     </style>
@@ -104,7 +115,7 @@
 <body class="print-cho3">
 
 <div class="no-print">
-    <h2>封筒宛名印刷（縦置き・横書き版）</h2>
+    <h2>封筒宛名印刷（在中スタンプ：名前寄り版）</h2>
     
     <div class="config-grid">
         <div class="config-item">
@@ -179,14 +190,16 @@
                     <div>${d.a1}</div>
                     <div style="margin-top:2mm">${d.a2}</div>
                 </div>
-                <div class="name-box">
-                    ${d.comp ? `<div class="company-row">${d.comp}</div>` : ''}
-                    <div class="name-row">
-                        ${d.title ? `<span class="title-sub">${d.title}</span>` : ''}
-                        ${d.name} <span class="hon-sub">${d.hon}</span>
+                <div class="name-container">
+                    <div class="name-group-inner">
+                        ${d.comp ? `<div class="company-row">${d.comp}</div>` : ''}
+                        <div class="name-row">
+                            ${d.title ? `<span class="title-sub">${d.title}</span>` : ''}
+                            ${d.name} <span class="hon-sub">${d.hon}</span>
+                        </div>
+                        ${stampText ? `<div class="stamp-box stamp-${stampColor}">${stampText}</div>` : ''}
                     </div>
                 </div>
-                ${stampText ? `<div class="stamp-box stamp-${stampColor}">${stampText}</div>` : ''}
             `;
             previewArea.appendChild(div);
         });
@@ -213,6 +226,7 @@
 
     document.getElementById('csvFile').addEventListener('change', function(e) {
         const file = e.target.files[0];
+        if(!file) return;
         const reader = new FileReader();
         reader.onload = function(event) {
             const uint8 = new Uint8Array(event.target.result);
@@ -221,10 +235,11 @@
             catch(e) { text = new TextDecoder('shift-jis').decode(uint8); }
             tableBody.innerHTML = '';
             text.split(/\r\n|\n|\r/).forEach((line, i) => {
-                if(!line || (i === 0 && line.includes('郵便番号'))) return;
+                if(!line || (i === 0 && (line.includes('郵便番号') || line.includes('住所')))) return;
                 const c = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"(.*)"$/, '$1').replace(/""/g,'"'));
                 addRow({zip:c[0]||'', a1:c[1]||'', a2:c[2]||'', comp:c[3]||'', title:c[4]||'', name:c[5]||'', hon:c[6]||'様'});
             });
+            document.getElementById('csvFile').value = '';
         };
         reader.readAsArrayBuffer(file);
     });
@@ -235,7 +250,7 @@
             csv += Array.from(row.querySelectorAll('input')).map(i => `"${i.value.replace(/"/g,'""')}"`).join(',') + "\n";
         });
         const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type:'text/csv'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'address.csv'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'address_list.csv'; a.click();
     }
     
     document.getElementById('stampText').addEventListener('input', updatePreview);
