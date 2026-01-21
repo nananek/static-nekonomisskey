@@ -2,17 +2,12 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>封筒宛名印刷</title>
+    <title>封筒宛名印刷（縦置き・横書き対応）</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
     
     <style>
-        :root {
-            --env-width: 235mm;
-            --env-height: 120mm;
-        }
-
         body { font-family: 'Noto Serif JP', serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
         
         /* 設定エリア */
@@ -24,7 +19,6 @@
         .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; background: #f8f9fa; padding: 15px; border-radius: 6px; }
         .config-item { display: flex; align-items: center; gap: 10px; }
         
-        /* テーブル設定 */
         table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; font-family: sans-serif; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background: #eee; }
@@ -33,9 +27,8 @@
         .btn-group { margin: 15px 0; display: flex; gap: 10px; }
         button { padding: 8px 15px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
         .print-btn { background: #e74c3c; color: white; margin-left: auto; }
-        .add-btn { background: #6c757d; color: white; }
 
-        /* 印刷設定 */
+        /* 印刷設定：縦置き (Portrait) */
         @media print {
             .no-print { display: none; }
             body { background: white; padding: 0; }
@@ -46,7 +39,7 @@
             }
         }
 
-        /* 封筒本体のスタイル */
+        /* 封筒本体（縦長） */
         .envelope {
             background: white;
             position: relative;
@@ -55,36 +48,45 @@
             box-shadow: 0 0 5px rgba(0,0,0,0.1);
             overflow: hidden;
             color: black;
+            box-sizing: border-box;
         }
 
-        /* 長形3号サイズ */
-        .size-cho3 { width: 235mm; height: 120mm; }
-        /* 角形2号サイズ */
-        .size-kaku2 { width: 332mm; height: 240mm; }
+        /* 長形3号（縦置き） */
+        .size-cho3 { width: 120mm; height: 235mm; }
+        /* 角形2号（縦置き） */
+        .size-kaku2 { width: 240mm; height: 332mm; }
 
+        /* ブラウザへの用紙サイズ指示 */
         @page { margin: 0; }
-        .print-cho3 { size: 235mm 120mm; }
-        .print-kaku2 { size: 332mm 240mm; }
+        .print-cho3 { size: 120mm 235mm; }
+        .print-kaku2 { size: 240mm 332mm; }
 
-        /* レイアウト：シール風（強弱を抑えた設定） */
-        .zip-code { position: absolute; font-weight: 700; font-size: 18pt; letter-spacing: 4px; }
-        .size-cho3 .zip-code { top: 15mm; left: 15mm; }
-        .size-kaku2 .zip-code { top: 25mm; left: 25mm; font-size: 24pt; }
+        /* レイアウト（縦置き状態での横書き） */
+        .zip-code { position: absolute; font-weight: 700; letter-spacing: 5px; }
+        .size-cho3 .zip-code { top: 15mm; left: 15mm; font-size: 16pt; }
+        .size-kaku2 .zip-code { top: 25mm; left: 25mm; font-size: 22pt; }
 
-        .address-box { position: absolute; width: 80%; line-height: 1.5; }
-        .size-cho3 .address-box { top: 35mm; left: 20mm; font-size: 14pt; }
-        .size-kaku2 .address-box { top: 55mm; left: 30mm; font-size: 20pt; }
+        .address-box { position: absolute; line-height: 1.6; word-break: break-all; }
+        .size-cho3 .address-box { top: 45mm; left: 15mm; width: 90mm; font-size: 13pt; }
+        .size-kaku2 .address-box { top: 70mm; left: 25mm; width: 190mm; font-size: 18pt; }
 
-        .name-box { position: absolute; display: flex; align-items: baseline; gap: 10px; }
-        .size-cho3 .name-box { top: 70mm; left: 40mm; font-size: 18pt; }
-        .size-kaku2 .name-box { top: 130mm; left: 60mm; font-size: 28pt; }
+        .name-box { position: absolute; width: 100%; text-align: center; }
+        .size-cho3 .name-box { top: 110mm; left: 0; }
+        .size-kaku2 .name-box { top: 170mm; left: 0; }
         
-        .company-row { font-size: 0.8em; margin-bottom: 2mm; }
-        .name-row { font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
-        .title-sub { font-size: 0.6em; font-weight: 400; margin-right: 5px; }
-        .hon-sub { font-size: 0.8em; font-weight: 400; }
+        .company-row { font-size: 0.9em; margin-bottom: 3mm; }
+        .name-row { font-weight: 700; display: inline-flex; align-items: baseline; gap: 8px; border-bottom: 0px solid #000; }
+        
+        /* フォントサイズを「シール風」に統一 */
+        .size-cho3 .company-row { font-size: 12pt; }
+        .size-cho3 .name-row { font-size: 18pt; }
+        .size-kaku2 .company-row { font-size: 16pt; }
+        .size-kaku2 .name-row { font-size: 26pt; }
 
-        /* 添え書き */
+        .title-sub { font-size: 0.7em; font-weight: 400; margin-right: 4px; }
+        .hon-sub { font-size: 0.8em; font-weight: 400; margin-left: 4px; }
+
+        /* 右下の添え書き */
         .stamp-box {
             position: absolute;
             font-weight: 700;
@@ -93,8 +95,8 @@
             padding: 4px 10px;
             white-space: nowrap;
         }
-        .size-cho3 .stamp-box { bottom: 15mm; right: 15mm; font-size: 13pt; }
-        .size-kaku2 .stamp-box { bottom: 30mm; right: 30mm; font-size: 18pt; }
+        .size-cho3 .stamp-box { bottom: 20mm; right: 10mm; font-size: 12pt; }
+        .size-kaku2 .stamp-box { bottom: 30mm; right: 20mm; font-size: 16pt; }
         .stamp-blue { color: #003399; border-color: #003399; }
         .stamp-red { color: #cc0000; border-color: #cc0000; }
     </style>
@@ -102,7 +104,7 @@
 <body class="print-cho3">
 
 <div class="no-print">
-    <h2>封筒宛名印刷</h2>
+    <h2>封筒宛名印刷（縦置き・横書き版）</h2>
     
     <div class="config-grid">
         <div class="config-item">
@@ -122,7 +124,7 @@
         <input type="file" id="csvFile" accept=".csv" style="display:none">
         <button onclick="document.getElementById('csvFile').click()" style="background:#3498db; color:white;">CSV読込</button>
         <button onclick="exportCSV()" style="background:#27ae60; color:white;">CSV保存</button>
-        <button class="add-btn" onclick="addRow()">行追加</button>
+        <button onclick="addRow()" style="background:#6c757d; color:white;">宛名追加</button>
         <button class="print-btn" onclick="window.print()">印刷する</button>
     </div>
 
@@ -159,7 +161,6 @@
         const rows = tableBody.querySelectorAll('tr');
         const previewArea = document.getElementById('previewArea');
         previewArea.innerHTML = '';
-        
         const stampText = document.getElementById('stampText').value;
         const stampColor = document.querySelector('input[name="stampColor"]:checked').value;
 
@@ -179,12 +180,10 @@
                     <div style="margin-top:2mm">${d.a2}</div>
                 </div>
                 <div class="name-box">
-                    <div>
-                        ${d.comp ? `<div class="company-row">${d.comp}</div>` : ''}
-                        <div class="name-row">
-                            ${d.title ? `<span class="title-sub">${d.title}</span>` : ''}
-                            ${d.name} <span class="hon-sub">${d.hon}</span>
-                        </div>
+                    ${d.comp ? `<div class="company-row">${d.comp}</div>` : ''}
+                    <div class="name-row">
+                        ${d.title ? `<span class="title-sub">${d.title}</span>` : ''}
+                        ${d.name} <span class="hon-sub">${d.hon}</span>
                     </div>
                 </div>
                 ${stampText ? `<div class="stamp-box stamp-${stampColor}">${stampText}</div>` : ''}
@@ -210,10 +209,8 @@
         updatePreview();
     }
 
-    // 初期データ
-    addRow({zip:'123-4567', a1:'東京都千代田区1-2-3', a2:'ハイツサンプル 101', comp:'株式会社テスター', title:'部長', name:'山田 太郎', hon:'様'});
+    addRow({zip:'123-4567', a1:'東京都千代田区1-2-3', a2:'サンプルビル 4F', comp:'株式会社サンプル', title:'代表取締役', name:'山田 太郎', hon:'様'});
 
-    // CSV読み込み (UTF-8-BOM / CP932対応)
     document.getElementById('csvFile').addEventListener('change', function(e) {
         const file = e.target.files[0];
         const reader = new FileReader();
@@ -222,12 +219,11 @@
             let text;
             try { text = new TextDecoder('utf-8', {fatal:true}).decode(uint8); }
             catch(e) { text = new TextDecoder('shift-jis').decode(uint8); }
-            
             tableBody.innerHTML = '';
             text.split(/\r\n|\n|\r/).forEach((line, i) => {
-                if(!line || i === 0 && line.includes('郵便番号')) return;
+                if(!line || (i === 0 && line.includes('郵便番号'))) return;
                 const c = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"(.*)"$/, '$1').replace(/""/g,'"'));
-                addRow({zip:c[0], a1:c[1], a2:c[2], comp:c[3], title:c[4], name:c[5], hon:c[6]||'様'});
+                addRow({zip:c[0]||'', a1:c[1]||'', a2:c[2]||'', comp:c[3]||'', title:c[4]||'', name:c[5]||'', hon:c[6]||'様'});
             });
         };
         reader.readAsArrayBuffer(file);
