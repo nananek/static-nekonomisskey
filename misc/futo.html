@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>封筒宛名印刷（在中スタンプ位置調整版）</title>
+    <title>封筒宛名印刷（180度反転・手差し対応版）</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
@@ -27,6 +27,7 @@
         button { padding: 8px 15px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
         .print-btn { background: #e74c3c; color: white; margin-left: auto; }
 
+        /* 印刷設定 */
         @media print {
             .no-print { display: none; }
             body { background: white; padding: 0; }
@@ -34,7 +35,11 @@
                 page-break-after: always;
                 border: none !important;
                 box-shadow: none !important;
+                /* 給紙方向に合わせて180度回転 */
+                transform: rotate(180deg);
+                transform-origin: center center;
             }
+            /* ブラウザの印刷ダイアログで「背景のグラフィック」をオンにする必要があります */
         }
 
         .envelope {
@@ -65,7 +70,7 @@
         .size-cho3 .address-box { top: 45mm; left: 15mm; width: 90mm; font-size: 13pt; }
         .size-kaku2 .address-box { top: 70mm; left: 25mm; width: 190mm; font-size: 18pt; }
 
-        /* 名前ブロックのコンテナ（中央寄せ用） */
+        /* 名前ブロックのコンテナ */
         .name-container {
             position: absolute;
             width: 100%;
@@ -75,12 +80,12 @@
         .size-cho3 .name-container { top: 110mm; }
         .size-kaku2 .name-container { top: 170mm; }
 
-        /* 名前グループ本体（相対配置の基準） */
+        /* 内部の左揃えブロック */
         .name-group-inner {
             display: inline-block;
             text-align: left;
-            position: relative; /* スタンプの配置基準にする */
-            padding-bottom: 10mm; /* スタンプ用のスペースを確保 */
+            position: relative;
+            padding-bottom: 12mm;
         }
         
         .company-row { font-size: 0.9em; margin-bottom: 3mm; white-space: nowrap; }
@@ -94,11 +99,11 @@
         .title-sub { font-size: 0.65em; font-weight: 400; margin-right: 0.5em; }
         .hon-sub { font-size: 0.8em; font-weight: 400; margin-left: 0.5em; }
 
-        /* 添え書きスタンプ（名前ブロックの右下に寄せる） */
+        /* 在中スタンプ（名前ブロックの右下） */
         .stamp-box {
             position: absolute;
-            bottom: -5mm;   /* 名前ブロックの下端からの距離 */
-            right: -2mm;    /* 名前ブロックの右端からの距離（少し外側に寄せる） */
+            bottom: -5mm;
+            right: -2mm;
             font-weight: 700;
             border: 2px solid;
             border-radius: 6px;
@@ -115,7 +120,7 @@
 <body class="print-cho3">
 
 <div class="no-print">
-    <h2>封筒宛名印刷（在中スタンプ：名前寄り版）</h2>
+    <h2>封筒宛名印刷（180度反転出力対応）</h2>
     
     <div class="config-grid">
         <div class="config-item">
@@ -136,7 +141,7 @@
         <button onclick="document.getElementById('csvFile').click()" style="background:#3498db; color:white;">CSV読込</button>
         <button onclick="exportCSV()" style="background:#27ae60; color:white;">CSV保存</button>
         <button onclick="addRow()" style="background:#6c757d; color:white;">宛名追加</button>
-        <button class="print-btn" onclick="window.print()">印刷する</button>
+        <button class="print-btn" onclick="window.print()">印刷を開始（反転出力）</button>
     </div>
 
     <table id="addressTable">
