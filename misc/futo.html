@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>封筒宛名印刷（上半分集中レイアウト）</title>
+    <title>封筒宛名印刷</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
@@ -10,15 +10,14 @@
     <style>
         body { font-family: 'Noto Serif JP', serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
         
-        /* 設定エリア */
         .no-print { 
             font-family: sans-serif;
             background: white; padding: 20px; border-radius: 8px; 
             max-width: 1100px; margin: 0 auto 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
         }
         .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 15px; background: #f8f9fa; padding: 15px; border-radius: 6px; }
-        .config-item { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
-        .config-label { font-weight: bold; min-width: 80px; }
+        .config-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .config-label { font-weight: bold; min-width: 90px; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; font-family: sans-serif; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
@@ -29,7 +28,6 @@
         button { padding: 8px 15px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
         .print-btn { background: #e74c3c; color: white; margin-left: auto; }
 
-        /* --- 印刷用設定 --- */
         @media print {
             .no-print { display: none; }
             body { background: white; padding: 0; }
@@ -38,7 +36,6 @@
                 border: none !important;
                 box-shadow: none !important;
             }
-            /* 反転設定 */
             .is-rotated .envelope {
                 transform: rotate(180deg);
                 transform-origin: center center;
@@ -56,68 +53,56 @@
             box-sizing: border-box;
         }
 
-        /* 縦置きサイズ */
-        .size-cho3 { width: 120mm; height: 235mm; } /* 長3 */
-        .size-kaku2 { width: 240mm; height: 332mm; } /* 角2 */
+        .size-cho3 { width: 120mm; height: 235mm; }
+        .size-kaku2 { width: 240mm; height: 332mm; }
 
         @page { margin: 0; }
 
-        /* --- 上半分集中レイアウト設定 --- */
-        
-        /* 1. 郵便番号：上から20mm */
+        /* レイアウト設定（上半分集中） */
         .zip-code { position: absolute; font-weight: 700; letter-spacing: 5px; top: 20mm; left: 15mm; }
-        .size-cho3 .zip-code { font-size: 16pt; left: 15mm; }
+        .size-cho3 .zip-code { font-size: 16pt; }
         .size-kaku2 .zip-code { font-size: 22pt; left: 25mm; }
 
-        /* 2. 住所：郵便番号のすぐ下 */
         .address-box { position: absolute; line-height: 1.5; word-break: break-all; }
         .size-cho3 .address-box { top: 38mm; left: 15mm; width: 90mm; font-size: 12pt; }
         .size-kaku2 .address-box { top: 45mm; left: 25mm; width: 190mm; font-size: 18pt; }
 
-        /* 3. 名前：住所のすぐ下（上半分に収める） */
-        .name-container {
-            position: absolute;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-        }
-        /* 長3(全高235mm)の上半分は117mm / 角2(全高332mm)の上半分は166mm */
+        .name-container { position: absolute; width: 100%; display: flex; justify-content: center; }
         .size-cho3 .name-container { top: 68mm; }
         .size-kaku2 .name-container { top: 95mm; }
 
-        .name-group-inner {
-            display: inline-block;
-            text-align: left;
-            position: relative;
-            padding-bottom: 12mm;
-        }
-        
+        .name-group-inner { display: inline-block; text-align: left; position: relative; padding-bottom: 20mm; }
         .company-row { font-size: 0.9em; margin-bottom: 2mm; white-space: nowrap; }
         .name-row { font-weight: 700; display: flex; align-items: baseline; white-space: nowrap; }
-        
         .size-cho3 .company-row { font-size: 11pt; }
         .size-cho3 .name-row { font-size: 17pt; }
         .size-kaku2 .company-row { font-size: 16pt; }
         .size-kaku2 .name-row { font-size: 26pt; }
-
         .title-sub { font-size: 0.65em; font-weight: 400; margin-right: 0.5em; }
         .hon-sub { font-size: 0.8em; font-weight: 400; margin-left: 0.5em; }
 
-        /* 在中スタンプ */
+        /* 在中スタンプ詳細設定 */
         .stamp-box {
             position: absolute;
-            bottom: -3mm;
-            right: -2mm;
             font-weight: 700;
             white-space: nowrap;
+            /* 名前ブロックの右下に配置 */
+            bottom: 0mm;
+            right: -2mm;
         }
-        .stamp-border {
-            border: 2px solid;
-            border-radius: 6px;
-            padding: 2px 8px;
-        }
-        .size-cho3 .stamp-box { font-size: 10pt; }
-        .size-kaku2 .stamp-box { font-size: 14pt; }
+
+        /* サイズ別スタイル */
+        .sz-normal { font-size: 11pt; }
+        .sz-large  { font-size: 16pt; }
+        .sz-huge   { font-size: 22pt; }
+
+        /* 角2の場合は少しスケールアップ */
+        .size-kaku2 .sz-normal { font-size: 14pt; }
+        .size-kaku2 .sz-large  { font-size: 20pt; }
+        .size-kaku2 .sz-huge   { font-size: 28pt; }
+
+        .stamp-border { border: 2px solid; border-radius: 6px; padding: 2px 8px; }
+        .sz-huge.stamp-border { border-width: 3px; border-radius: 8px; padding: 4px 12px; }
         
         .stamp-blue { color: #003399; border-color: #003399; }
         .stamp-red { color: #cc0000; border-color: #cc0000; }
@@ -127,17 +112,17 @@
 <body class="print-cho3">
 
 <div class="no-print">
-    <h2>封筒宛名印刷（上半分集中・2cm余白版）</h2>
+    <h2>封筒宛名印刷</h2>
     
     <div class="config-grid">
         <div>
             <div class="config-item">
-                <span class="config-label">サイズ:</span>
+                <span class="config-label">封筒サイズ:</span>
                 <label><input type="radio" name="envSize" value="cho3" checked onchange="changeSize('cho3')"> 長形3号</label>
                 <label><input type="radio" name="envSize" value="kaku2" onchange="changeSize('kaku2')"> 角形2号</label>
             </div>
-            <div class="config-item" style="margin-top:10px;">
-                <span class="config-label">出力方向:</span>
+            <div class="config-item">
+                <span class="config-label">方向転換:</span>
                 <label style="cursor: pointer; color: #d9534f;">
                     <input type="checkbox" id="printRotate" onchange="updatePreview()"> 180度反転して印刷する
                 </label>
@@ -146,16 +131,19 @@
         <div>
             <div class="config-item">
                 <span class="config-label">在中スタンプ:</span>
-                <input type="text" id="stampText" value="請求書在中" style="width:120px" oninput="updatePreview()">
+                <input type="text" id="stampText" value="請求書在中" style="width:140px" oninput="updatePreview()">
                 <label><input type="radio" name="stampColor" value="blue" checked onchange="updatePreview()"> 青</label>
                 <label><input type="radio" name="stampColor" value="red" onchange="updatePreview()"> 赤</label>
                 <label><input type="radio" name="stampColor" value="black" onchange="updatePreview()"> 黒</label>
             </div>
             <div class="config-item">
-                <span class="config-label"></span>
-                <label style="cursor: pointer;">
-                    <input type="checkbox" id="stampHasBorder" checked onchange="updatePreview()"> 角丸の囲み枠をつける
-                </label>
+                <span class="config-label">表示設定:</span>
+                <select id="stampSize" onchange="updatePreview()" style="padding: 3px;">
+                    <option value="sz-normal">サイズ：標準</option>
+                    <option value="sz-large" selected>サイズ：大</option>
+                    <option value="sz-huge">サイズ：特大</option>
+                </select>
+                <label style="margin-left:10px;"><input type="checkbox" id="stampHasBorder" checked onchange="updatePreview()"> 枠あり</label>
             </div>
         </div>
     </div>
@@ -210,6 +198,7 @@
 
         const stampText = document.getElementById('stampText').value;
         const stampColor = document.querySelector('input[name="stampColor"]:checked').value;
+        const stampSizeClass = document.getElementById('stampSize').value;
         const hasBorder = document.getElementById('stampHasBorder').checked;
 
         rows.forEach(row => {
@@ -221,13 +210,12 @@
 
             const div = document.createElement('div');
             div.className = `envelope size-${currentSize}`;
-            
             const zipHtml = d.zip ? `<div class="zip-code">〒 ${d.zip}</div>` : '';
             
             let stampHtml = '';
             if (stampText) {
                 const borderClass = hasBorder ? 'stamp-border' : '';
-                stampHtml = `<div class="stamp-box stamp-${stampColor} ${borderClass}">${stampText}</div>`;
+                stampHtml = `<div class="stamp-box ${stampSizeClass} stamp-${stampColor} ${borderClass}">${stampText}</div>`;
             }
 
             div.innerHTML = `
