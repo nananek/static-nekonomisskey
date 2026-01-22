@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>封筒宛名印刷（プロ仕様・180度反転）</title>
+    <title>封筒宛名印刷（反転切替対応）</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
@@ -15,8 +15,9 @@
             background: white; padding: 20px; border-radius: 8px; 
             max-width: 1100px; margin: 0 auto 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
         }
-        .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; background: #f8f9fa; padding: 15px; border-radius: 6px; }
-        .config-item { display: flex; align-items: center; gap: 10px; }
+        .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 15px; background: #f8f9fa; padding: 15px; border-radius: 6px; }
+        .config-item { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+        .config-label { font-weight: bold; min-width: 80px; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; font-family: sans-serif; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
@@ -27,6 +28,7 @@
         button { padding: 8px 15px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
         .print-btn { background: #e74c3c; color: white; margin-left: auto; }
 
+        /* --- 印刷用設定 --- */
         @media print {
             .no-print { display: none; }
             body { background: white; padding: 0; }
@@ -34,6 +36,9 @@
                 page-break-after: always;
                 border: none !important;
                 box-shadow: none !important;
+            }
+            /* 反転クラスがついている場合のみ180度回転 */
+            .is-rotated .envelope {
                 transform: rotate(180deg);
                 transform-origin: center center;
             }
@@ -54,8 +59,7 @@
         .size-kaku2 { width: 240mm; height: 332mm; }
 
         @page { margin: 0; }
-        .print-cho3 { size: 120mm 235mm; }
-        .print-kaku2 { size: 240mm 332mm; }
+        /* 用紙サイズはJavaScriptで動的に切り替え */
 
         /* 郵便番号 */
         .zip-code { position: absolute; font-weight: 700; letter-spacing: 5px; }
@@ -95,7 +99,7 @@
         .title-sub { font-size: 0.65em; font-weight: 400; margin-right: 0.5em; }
         .hon-sub { font-size: 0.8em; font-weight: 400; margin-left: 0.5em; }
 
-        /* 在中スタンプ */
+        /* 添え書きスタンプ */
         .stamp-box {
             position: absolute;
             bottom: -5mm;
@@ -114,37 +118,53 @@
         .stamp-blue { color: #003399; border-color: #003399; }
         .stamp-red { color: #cc0000; border-color: #cc0000; }
         .stamp-black { color: #000000; border-color: #000000; }
+
+        /* 反転プレビュー用（視覚的な確認のため画面上でも反転させたい場合用、今回は印刷時のみに限定） */
+        .screen-rotate { transform: rotate(180deg); }
     </style>
 </head>
 <body class="print-cho3">
 
 <div class="no-print">
-    <h2>封筒宛名印刷（反転出力・詳細設定版）</h2>
+    <h2>封筒宛名印刷（設定カスタマイズ版）</h2>
     
     <div class="config-grid">
-        <div class="config-item">
-            <strong>封筒サイズ:</strong>
-            <label><input type="radio" name="envSize" value="cho3" checked onchange="changeSize('cho3')"> 長形3号</label>
-            <label><input type="radio" name="envSize" value="kaku2" onchange="changeSize('kaku2')"> 角形2号</label>
+        <div>
+            <div class="config-item">
+                <span class="config-label">サイズ:</span>
+                <label><input type="radio" name="envSize" value="cho3" checked onchange="changeSize('cho3')"> 長形3号</label>
+                <label><input type="radio" name="envSize" value="kaku2" onchange="changeSize('kaku2')"> 角形2号</label>
+            </div>
+            <div class="config-item" style="margin-top:10px; color: #d9534f;">
+                <span class="config-label">出力方向:</span>
+                <label style="cursor: pointer;">
+                    <input type="checkbox" id="printRotate" onchange="updatePreview()"> 180度反転して印刷する
+                </label>
+            </div>
         </div>
-        <div class="config-item">
-            <strong>添え書き設定:</strong>
-            <input type="text" id="stampText" value="請求書在中" style="width:120px">
-            <label><input type="radio" name="stampColor" value="blue" checked onchange="updatePreview()"> 青</label>
-            <label><input type="radio" name="stampColor" value="red" onchange="updatePreview()"> 赤</label>
-            <label><input type="radio" name="stampColor" value="black" onchange="updatePreview()"> 黒</label>
-            <label style="margin-left: 10px; font-weight: bold;">
-                <input type="checkbox" id="stampHasBorder" checked onchange="updatePreview()"> 枠あり
-            </label>
+        <div>
+            <div class="config-item">
+                <span class="config-label">添え書き:</span>
+                <input type="text" id="stampText" value="請求書在中" style="width:120px" oninput="updatePreview()">
+                <label><input type="radio" name="stampColor" value="blue" checked onchange="updatePreview()"> 青</label>
+                <label><input type="radio" name="stampColor" value="red" onchange="updatePreview()"> 赤</label>
+                <label><input type="radio" name="stampColor" value="black" onchange="updatePreview()"> 黒</label>
+            </div>
+            <div class="config-item">
+                <span class="config-label"></span>
+                <label style="cursor: pointer;">
+                    <input type="checkbox" id="stampHasBorder" checked onchange="updatePreview()"> 角丸の囲み枠をつける
+                </label>
+            </div>
         </div>
     </div>
 
     <div class="btn-group">
         <input type="file" id="csvFile" accept=".csv" style="display:none">
-        <button onclick="document.getElementById('csvFile').click()" style="background:#3498db; color:white;">CSV読込</button>
+        <button onclick="document.getElementById('csvFile').click()" style="background:#3498db; color:white;">CSV読込 (SJIS/UTF8)</button>
         <button onclick="exportCSV()" style="background:#27ae60; color:white;">CSV保存</button>
-        <button onclick="addRow()" style="background:#6c757d; color:white;">宛名追加</button>
-        <button class="print-btn" onclick="window.print()">印刷を開始（反転出力）</button>
+        <button onclick="addRow()" style="background:#6c757d; color:white;">行追加</button>
+        <button class="print-btn" onclick="window.print()">印刷を実行する</button>
     </div>
 
     <table id="addressTable">
@@ -181,6 +201,13 @@
         const previewArea = document.getElementById('previewArea');
         previewArea.innerHTML = '';
         
+        // 印刷時の回転設定をクラスで制御
+        if(document.getElementById('printRotate').checked) {
+            previewArea.classList.add('is-rotated');
+        } else {
+            previewArea.classList.remove('is-rotated');
+        }
+
         const stampText = document.getElementById('stampText').value;
         const stampColor = document.querySelector('input[name="stampColor"]:checked').value;
         const hasBorder = document.getElementById('stampHasBorder').checked;
@@ -243,8 +270,10 @@
         updatePreview();
     }
 
+    // 初期サンプル
     addRow({zip:'123-4567', a1:'東京都千代田区1-2-3', a2:'サンプルビル 4F', comp:'株式会社サンプル', title:'代表取締役', name:'山田 太郎', hon:'様'});
 
+    // CSV読み込み (UTF-8-BOM / CP932対応)
     document.getElementById('csvFile').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if(!file) return;
@@ -273,8 +302,6 @@
         const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type:'text/csv'});
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'address_list.csv'; a.click();
     }
-    
-    document.getElementById('stampText').addEventListener('input', updatePreview);
 </script>
 </body>
 </html>
