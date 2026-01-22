@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>封筒宛名印刷（180度反転・手差し対応版）</title>
+    <title>封筒宛名印刷（プロ仕様・180度反転）</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
@@ -27,7 +27,6 @@
         button { padding: 8px 15px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
         .print-btn { background: #e74c3c; color: white; margin-left: auto; }
 
-        /* 印刷設定 */
         @media print {
             .no-print { display: none; }
             body { background: white; padding: 0; }
@@ -35,11 +34,9 @@
                 page-break-after: always;
                 border: none !important;
                 box-shadow: none !important;
-                /* 給紙方向に合わせて180度回転 */
                 transform: rotate(180deg);
                 transform-origin: center center;
             }
-            /* ブラウザの印刷ダイアログで「背景のグラフィック」をオンにする必要があります */
         }
 
         .envelope {
@@ -70,7 +67,7 @@
         .size-cho3 .address-box { top: 45mm; left: 15mm; width: 90mm; font-size: 13pt; }
         .size-kaku2 .address-box { top: 70mm; left: 25mm; width: 190mm; font-size: 18pt; }
 
-        /* 名前ブロックのコンテナ */
+        /* 名前ブロック */
         .name-container {
             position: absolute;
             width: 100%;
@@ -80,7 +77,6 @@
         .size-cho3 .name-container { top: 110mm; }
         .size-kaku2 .name-container { top: 170mm; }
 
-        /* 内部の左揃えブロック */
         .name-group-inner {
             display: inline-block;
             text-align: left;
@@ -99,28 +95,31 @@
         .title-sub { font-size: 0.65em; font-weight: 400; margin-right: 0.5em; }
         .hon-sub { font-size: 0.8em; font-weight: 400; margin-left: 0.5em; }
 
-        /* 在中スタンプ（名前ブロックの右下） */
+        /* 在中スタンプ */
         .stamp-box {
             position: absolute;
             bottom: -5mm;
             right: -2mm;
             font-weight: 700;
+            white-space: nowrap;
+        }
+        .stamp-border {
             border: 2px solid;
             border-radius: 6px;
             padding: 2px 8px;
-            white-space: nowrap;
         }
         .size-cho3 .stamp-box { font-size: 11pt; }
         .size-kaku2 .stamp-box { font-size: 15pt; }
         
         .stamp-blue { color: #003399; border-color: #003399; }
         .stamp-red { color: #cc0000; border-color: #cc0000; }
+        .stamp-black { color: #000000; border-color: #000000; }
     </style>
 </head>
 <body class="print-cho3">
 
 <div class="no-print">
-    <h2>封筒宛名印刷（180度反転出力対応）</h2>
+    <h2>封筒宛名印刷（反転出力・詳細設定版）</h2>
     
     <div class="config-grid">
         <div class="config-item">
@@ -129,10 +128,14 @@
             <label><input type="radio" name="envSize" value="kaku2" onchange="changeSize('kaku2')"> 角形2号</label>
         </div>
         <div class="config-item">
-            <strong>添え書き:</strong>
+            <strong>添え書き設定:</strong>
             <input type="text" id="stampText" value="請求書在中" style="width:120px">
             <label><input type="radio" name="stampColor" value="blue" checked onchange="updatePreview()"> 青</label>
             <label><input type="radio" name="stampColor" value="red" onchange="updatePreview()"> 赤</label>
+            <label><input type="radio" name="stampColor" value="black" onchange="updatePreview()"> 黒</label>
+            <label style="margin-left: 10px; font-weight: bold;">
+                <input type="checkbox" id="stampHasBorder" checked onchange="updatePreview()"> 枠あり
+            </label>
         </div>
     </div>
 
@@ -177,32 +180,45 @@
         const rows = tableBody.querySelectorAll('tr');
         const previewArea = document.getElementById('previewArea');
         previewArea.innerHTML = '';
+        
         const stampText = document.getElementById('stampText').value;
         const stampColor = document.querySelector('input[name="stampColor"]:checked').value;
+        const hasBorder = document.getElementById('stampHasBorder').checked;
 
         rows.forEach(row => {
             const inputs = row.querySelectorAll('input');
             const d = {
-                zip: inputs[0].value, a1: inputs[1].value, a2: inputs[2].value,
-                comp: inputs[3].value, title: inputs[4].value, name: inputs[5].value, hon: inputs[6].value
+                zip: inputs[0].value.trim(), a1: inputs[1].value.trim(), a2: inputs[2].value.trim(),
+                comp: inputs[3].value.trim(), title: inputs[4].value.trim(), name: inputs[5].value.trim(), hon: inputs[6].value.trim()
             };
 
             const div = document.createElement('div');
             div.className = `envelope size-${currentSize}`;
+            
+            // 郵便番号がある場合のみ〒マークを表示
+            const zipHtml = d.zip ? `<div class="zip-code">〒 ${d.zip}</div>` : '';
+            
+            // 添え書きスタンプのHTML
+            let stampHtml = '';
+            if (stampText) {
+                const borderClass = hasBorder ? 'stamp-border' : '';
+                stampHtml = `<div class="stamp-box stamp-${stampColor} ${borderClass}">${stampText}</div>`;
+            }
+
             div.innerHTML = `
-                <div class="zip-code">〒 ${d.zip}</div>
+                ${zipHtml}
                 <div class="address-box">
-                    <div>${d.a1}</div>
-                    <div style="margin-top:2mm">${d.a2}</div>
+                    ${d.a1 ? `<div>${d.a1}</div>` : ''}
+                    ${d.a2 ? `<div style="margin-top:2mm">${d.a2}</div>` : ''}
                 </div>
                 <div class="name-container">
                     <div class="name-group-inner">
                         ${d.comp ? `<div class="company-row">${d.comp}</div>` : ''}
                         <div class="name-row">
                             ${d.title ? `<span class="title-sub">${d.title}</span>` : ''}
-                            ${d.name} <span class="hon-sub">${d.hon}</span>
+                            ${d.name} ${d.name ? `<span class="hon-sub">${d.hon}</span>` : ''}
                         </div>
-                        ${stampText ? `<div class="stamp-box stamp-${stampColor}">${stampText}</div>` : ''}
+                        ${stampHtml}
                     </div>
                 </div>
             `;
