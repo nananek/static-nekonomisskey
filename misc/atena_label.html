@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>宛名ラベル印刷（装飾なし・均一版）</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --sheet-width: 210mm;
+            --sheet-height: 297mm;
+            --margin-top: 21.5mm;
+            --margin-side: 19mm;
+            --column-gap: 3.5mm;
+            --label-width: 84.25mm;
+            --label-height: 42.33mm;
+        }
+
+        /* 太字を完全に排除するため font-weight を 400 に固定 */
+        body { 
+            font-family: 'Noto Serif JP', serif; 
+            font-weight: 400; 
+            background: #f0f2f5; 
+            margin: 0; 
+            padding: 20px; 
+            color: #333; 
+        }
+        
+        .no-print { 
+            font-family: sans-serif; background: white; padding: 20px; border-radius: 8px; 
+            max-width: 1100px; margin: 0 auto 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+
+        .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; background: #f8f9fa; padding: 15px; border-radius: 6px; }
+        .config-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .config-label { font-weight: normal; min-width: 100px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; font-family: sans-serif; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-weight: normal; }
+        th { background: #eee; }
+        input[type="text"], input[type="number"] { padding: 5px; border: 1px solid #ccc; border-radius: 3px; width: 90%; }
+
+        .btn-group { margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap; }
+        button { padding: 8px 15px; cursor: pointer; border: none; border-radius: 4px; font-weight: normal; }
+        .print-btn { background: #e74c3c; color: white; margin-left: auto; }
+
+        @page { size: A4; margin: 0; }
+        @media print {
+            .no-print { display: none; }
+            body { background: white; padding: 0; }
+            .label-sheet { box-shadow: none !important; border: none !important; page-break-after: always; }
+            .hide-border .label-cell { border: none !important; }
+        }
+
+        .label-sheet {
+            width: var(--sheet-width);
+            height: var(--sheet-height);
+            background: white;
+            margin: 0 auto 20px;
+            padding: var(--margin-top) var(--margin-side);
+            display: grid;
+            grid-template-columns: var(--label-width) var(--label-width);
+            grid-template-rows: repeat(6, var(--label-height));
+            column-gap: var(--column-gap);
+            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        .label-cell {
+            border: 0.2mm dotted #bbb;
+            box-sizing: border-box;
+            padding: 6mm 8mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            overflow: hidden;
+            color: black;
+            line-height: 1.5;
+        }
+
+        .hide-border .label-cell { border-color: transparent; }
+
+        /* 文字サイズと太さを一律化 */
+        .l-zip { font-size: 11pt; font-weight: 400; margin-bottom: 2mm; }
+        .l-address { font-size: 11pt; font-weight: 400; margin-bottom: 2mm; word-break: break-all; }
+        
+        .l-name-container { margin-top: auto; margin-bottom: auto; }
+        .l-comp-row { font-size: 11pt; font-weight: 400; }
+        .l-name-row { font-size: 11pt; font-weight: 400; }
+        .l-hon { margin-left: 0.2em; }
+    </style>
+</head>
+<body>
+
+<div class="no-print">
+    <h2>宛名ラベルシール印刷 (2列×6行)</h2>
+    
+    <div class="config-grid">
+        <div>
+            <div class="config-item">
+                <span class="config-label">開始位置:</span>
+                <input type="number" id="startPos" value="1" min="1" max="12" onchange="updatePreview()" style="width: 60px;">
+                <small>（1:左上 〜 12:右下）</small>
+            </div>
+            <div class="config-item">
+                <span class="config-label">ガイド枠線:</span>
+                <label style="cursor: pointer; color: #0056b3;">
+                    <input type="checkbox" id="showBorder" onchange="updatePreview()"> 試し刷り用の枠線を表示する
+                </label>
+            </div>
+        </div>
+        <div>
+            <div class="config-item">
+                <span class="config-label">フォント:</span>
+                <select onchange="document.getElementById('previewArea').style.fontFamily = this.value; updatePreview();" style="padding: 4px;">
+                    <option value="'Noto Serif JP', serif">明朝体</option>
+                    <option value="sans-serif">ゴシック体</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <input type="file" id="csvFile" accept=".csv" style="display:none">
+        <button onclick="document.getElementById('csvFile').click()" style="background:#3498db; color:white;">CSV読込</button>
+        <button onclick="exportCSV()" style="background:#27ae60; color:white;">CSV保存</button>
+        <button onclick="addRow()" style="background:#6c757d; color:white;">行追加</button>
+        <button class="print-btn" onclick="window.print()">印刷を実行する</button>
+    </div>
+
+    <table id="addressTable">
+        <thead>
+            <tr>
+                <th style="width:100px">郵便番号</th>
+                <th>住所1</th>
+                <th>住所2</th>
+                <th>会社名</th>
+                <th>役職・部署</th>
+                <th>お名前</th>
+                <th style="width:60px">敬称</th>
+                <th style="width:40px"></th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="previewArea" class="hide-border"></div>
+
+<script>
+    const tableBody = document.querySelector('#addressTable tbody');
+
+    function updatePreview() {
+        const rows = Array.from(tableBody.querySelectorAll('tr'));
+        const previewArea = document.getElementById('previewArea');
+        const showBorder = document.getElementById('showBorder').checked;
+        
+        previewArea.innerHTML = '';
+        if (showBorder) {
+            previewArea.classList.remove('hide-border');
+        } else {
+            previewArea.classList.add('hide-border');
+        }
+        
+        const startPos = parseInt(document.getElementById('startPos').value) || 1;
+        
+        const dataList = rows.map(row => {
+            const inputs = row.querySelectorAll('input');
+            return {
+                zip: inputs[0].value.trim(), a1: inputs[1].value.trim(), a2: inputs[2].value.trim(),
+                comp: inputs[3].value.trim(), title: inputs[4].value.trim(), name: inputs[5].value.trim(), hon: inputs[6].value.trim()
+            };
+        });
+
+        const displayList = [];
+        for(let i=1; i < startPos; i++) { displayList.push(null); }
+        displayList.push(...dataList);
+
+        for (let i = 0; i < displayList.length; i += 12) {
+            const sheet = document.createElement('div');
+            sheet.className = 'label-sheet';
+            const sheetData = displayList.slice(i, i + 12);
+            
+            for (let j = 0; j < 12; j++) {
+                const d = sheetData[j];
+                const cell = document.createElement('div');
+                cell.className = 'label-cell';
+                
+                if (d) {
+                    cell.innerHTML = `
+                        <div class="l-zip">〒 ${d.zip}</div>
+                        <div class="l-address">
+                            <div>${d.a1}</div>
+                            <div>${d.a2}</div>
+                        </div>
+                        <div class="l-name-container">
+                            <div class="l-comp-row">${d.comp} ${d.title}</div>
+                            <div class="l-name-row">${d.name}<span class="l-hon">${d.name ? d.hon : ''}</span></div>
+                        </div>
+                    `;
+                }
+                sheet.appendChild(cell);
+            }
+            previewArea.appendChild(sheet);
+        }
+    }
+
+    function addRow(data = {zip:'', a1:'', a2:'', comp:'', title:'', name:'', hon:'様'}) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" value="${data.zip}"></td>
+            <td><input type="text" value="${data.a1}"></td>
+            <td><input type="text" value="${data.a2}"></td>
+            <td><input type="text" value="${data.comp}"></td>
+            <td><input type="text" value="${data.title}"></td>
+            <td><input type="text" value="${data.name}"></td>
+            <td><input type="text" value="${data.hon}"></td>
+            <td><button style="background:none; color:red; cursor:pointer;" onclick="this.parentElement.parentElement.remove(); updatePreview();">×</button></td>
+        `;
+        tableBody.appendChild(tr);
+        tr.querySelectorAll('input').forEach(i => i.addEventListener('input', updatePreview));
+        updatePreview();
+    }
+
+    window.onload = () => {
+        addRow({
+            zip: '100-0001', 
+            a1: '東京都千代田区千代田1-1', 
+            a2: 'サンプルラベルビル 101号室', 
+            comp: '株式会社サンプル', 
+            title: '営業部', 
+            name: '山田 太郎', 
+            hon: '様'
+        });
+    };
+
+    // CSV/Export logic (unchanged)
+    document.getElementById('csvFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const uint8 = new Uint8Array(event.target.result);
+            let text;
+            try { text = new TextDecoder('utf-8', {fatal:true}).decode(uint8); }
+            catch(e) { text = new TextDecoder('shift-jis').decode(uint8); }
+            tableBody.innerHTML = '';
+            text.split(/\r\n|\n|\r/).forEach((line, i) => {
+                if(!line || (i === 0 && line.includes('郵便番号'))) return;
+                const c = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"(.*)"$/, '$1').replace(/""/g,'"'));
+                addRow({zip:c[0]||'', a1:c[1]||'', a2:c[2]||'', comp:c[3]||'', title:c[4]||'', name:c[5]||'', hon:c[6]||'様'});
+            });
+            document.getElementById('csvFile').value = '';
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    function exportCSV() {
+        let csv = "郵便番号,住所1,住所2,会社名,役職,名前,敬称\n";
+        tableBody.querySelectorAll('tr').forEach(row => {
+            csv += Array.from(row.querySelectorAll('input')).map(i => `"${i.value.replace(/"/g,'""')}"`).join(',') + "\n";
+        });
+        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type:'text/csv'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'address_labels.csv'; a.click();
+    }
+</script>
+</body>
+</html>
