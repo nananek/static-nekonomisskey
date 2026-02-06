@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: A4; margin: 0; }
+        body { font-family: "Hiragino Mincho ProN", serif; background: #525659; margin: 0; padding: 20px; }
+        #controls { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        @media print { #controls { display: none; } body { background: white; padding: 0; } }
+
+        .sheet {
+            width: 210mm; height: 297mm; background: white; margin: 0 auto;
+            display: grid; padding-top: 20mm; padding-left: 15mm;
+            grid-template-columns: repeat(9, 21mm); 
+            grid-template-rows: repeat(8, 28mm);
+            gap: 2mm 3mm; box-sizing: border-box; page-break-after: always;
+        }
+
+        .label {
+            width: 21mm; height: 28mm; display: flex; flex-direction: column;
+            justify-content: space-around; align-items: center;
+            border: 0.1mm dotted #ccc; box-sizing: border-box;
+            writing-mode: vertical-rl; text-orientation: upright;
+        }
+
+        /* 表と裏のエリア */
+        .side {
+            display: flex; justify-content: center; align-items: center;
+            height: 45%; width: 100%; overflow: hidden;
+            outline: none; line-height: 1.2; white-space: pre-wrap; /* 改行許可 */
+        }
+        
+        /* 折り返し地点のガイド（印刷時は消える） */
+        .fold-line { border-top: 1px dashed #eee; width: 100%; height: 0; }
+
+        .label:empty { background: none; }
+        @media print { .label { border: none; } .fold-line { border: none; } }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <h3>総勘定元帳インデックス作成</h3>
+    <input type="file" id="csvFile" accept=".csv"> 
+    列: <input type="number" id="colIdx" value="1" min="1" style="width:40px;"> 
+    開始位置(1〜72): <input type="number" id="startPos" value="1" min="1" style="width:50px;">
+    <button onclick="generateLabels()">CSV読み込み</button>
+    <p><small>※ラベル内を直接クリックして編集・改行（Enter）できます。表を書き換えると裏も同期します。</small></p>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+function generateLabels() {
+    const fileInput = document.getElementById('csvFile');
+    const colIdx = parseInt(document.getElementById('colIdx').value) - 1;
+    const startPos = parseInt(document.getElementById('startPos').value) - 1;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const lines = e.target.result.split(/\r\n|\n/);
+        const titles = lines.map(line => {
+            const cols = line.split(',');
+            return cols[colIdx] ? cols[colIdx].trim() : "";
+        }).filter(t => t !== "");
+
+        renderSheet(titles, startPos);
+    };
+    reader.readAsText(fileInput.files[0], 'Shift-JIS');
+}
+
+function renderSheet(titles, start) {
+    const printArea = document.getElementById('printArea');
+    printArea.innerHTML = "";
+    let currentSheet = createSheet();
+    printArea.appendChild(currentSheet);
+
+    // 空白埋め
+    for (let i = 0; i < start; i++) {
+        currentSheet.appendChild(createLabelElement(""));
+    }
+
+    // データ埋め
+    titles.forEach((title, index) => {
+        if ((start + index) > 0 && (start + index) % 72 === 0) {
+            currentSheet = createSheet();
+            printArea.appendChild(currentSheet);
+        }
+        currentSheet.appendChild(createLabelElement(title));
+    });
+}
+
+function createSheet() {
+    const div = document.createElement('div');
+    div.className = 'sheet';
+    return div;
+}
+
+function createLabelElement(text) {
+    const label = document.createElement('div');
+    label.className = 'label';
+    if (text === "") return label;
+
+    // 表側
+    const sideA = document.createElement('div');
+    sideA.className = 'side';
+    sideA.contentEditable = true;
+    sideA.textContent = text;
+
+    // 折り返し線
+    const line = document.createElement('div');
+    line.className = 'fold-line';
+
+    // 裏側
+    const sideB = document.createElement('div');
+    sideB.className = 'side';
+    sideB.textContent = text; // 初期値
+
+    // 同期処理：表(sideA)を編集したら裏(sideB)に反映
+    sideA.oninput = () => { sideB.textContent = sideA.textContent; };
+
+    label.appendChild(sideA);
+    label.appendChild(line);
+    label.appendChild(sideB);
+    return label;
+}
+</script>
+</body>
+</html>
