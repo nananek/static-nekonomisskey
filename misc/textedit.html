@@ -3,29 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CSV保存ツール</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/encoding-japanese/2.0.0/encoding.min.js"></script>
+<title>CSV保存 (Shift_JIS対応)</title>
 <style>
   body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
   .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-  textarea { width: 100%; height: 200px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; box-sizing: border-box; }
-  .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-  select, button { padding: 10px; font-size: 16px; height: 44px; box-sizing: border-box; }
+  textarea { width: 100%; height: 200px; margin-bottom: 10px; border: 1px solid #ccc; font-family: monospace; }
+  .controls { display: flex; gap: 10px; align-items: center; }
+  select, button { padding: 10px; font-size: 16px; height: 44px; }
   button { background: #007bff; color: white; border: none; border-radius: 4px; flex-grow: 1; font-weight: bold; }
-  label { font-size: 14px; font-weight: bold; }
 </style>
 </head>
 <body>
 
 <div class="container">
   <h3>CSV作成・保存</h3>
-  <p style="font-size:12px; color:#666;">Excelやメモ帳からデータを貼り付けてください。</p>
-  
-  <textarea id="content" placeholder="ID,科目名,備考&#13;&#10;1,現金,&#13;&#10;2,普通預金,メイン"></textarea>
+  <textarea id="content" placeholder="ID,科目名,備考&#13;&#10;1,現金,&#13;&#10;2,普通預金,メイン">ID,科目名,備考
+1,現金,
+2,当座預金,
+3,普通預金,
+4,受取手形,
+5,売掛金,
+6,棚卸資産,
+7,建物,
+8,減価償却累計額,</textarea>
   
   <div class="controls">
     <select id="encoding">
-      <option value="utf-8-bom">UTF-8 (BOM付: Excel/iPhone用)</option>
-      <option value="utf-8">UTF-8 (標準)</option>
+      <option value="SJIS">Shift_JIS (Excel標準)</option>
+      <option value="UTF8">UTF-8</option>
     </select>
     <button onclick="saveFile()">CSVを保存</button>
   </div>
@@ -35,25 +41,29 @@
 function saveFile() {
   const text = document.getElementById('content').value;
   if (!text) return alert("テキストを入力してください");
+  
+  const encOption = document.getElementById('encoding').value;
+  let data;
 
-  const encoding = document.getElementById('encoding').value;
-  let blob;
-
-  // エンコード処理
-  if (encoding === 'utf-8-bom') {
-    // BOM (Byte Order Mark) を付与してExcelで文字化けしないようにする
-    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-    blob = new Blob([bom, text], { type: 'text/csv' });
+  if (encOption === 'SJIS') {
+    // 文字列をShift_JISの文字コード配列に変換
+    const unicodeArray = Encoding.stringToCode(text);
+    const sjisArray = Encoding.convert(unicodeArray, {
+      to: 'SJIS',
+      from: 'UNICODE'
+    });
+    data = new Uint8Array(sjisArray);
   } else {
-    blob = new Blob([text], { type: 'text/csv' });
+    // UTF-8の場合
+    data = new TextEncoder().encode(text);
   }
 
-  // ダウンロードリンク生成
+  const blob = new Blob([data], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = 'data.csv';
-  document.body.appendChild(a); // Firefox/iOS対応のため追加
+  document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
