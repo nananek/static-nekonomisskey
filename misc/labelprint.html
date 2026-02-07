@@ -3,27 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>インデックスラベル作成 (中心軸絶対配置版)</title>
+<title>インデックスラベル作成 (印刷修正版)</title>
 <style>
-    /* --- パラメータ定義 (Pythonコード由来) --- */
+    /* --- パラメータ定義 --- */
     :root {
-        /* mirroring_distance = 6.1mm */
-        /* 中心軸から左右にどれだけ離れるか */
         --mirror-dist: 6.1mm; 
-        
-        /* 全体のズレ補正 */
         --offset-x: 0mm;
         --offset-y: 0mm;
-        
-        /* ラベル1枚のサイズ */
-        --cell-w: 31.5mm; /* perrow */
-        --cell-h: 24.8mm; /* percol */
-        
-        /* 用紙余白 (Start座標からの逆算) */
+        --cell-w: 31.5mm; 
+        --cell-h: 24.8mm;
         --margin-top: 2.2mm;   
         --margin-right: 5.65mm;
-        
-        /* フォント設定 (Python: 3.3mm) */
         --base-font-size: 3.3mm;
     }
 
@@ -50,14 +40,20 @@
     }
 
     /* --- 用紙設定 (A4 Landscape) --- */
-    @page { size: A4 landscape; margin: 0; }
+    @page { 
+        size: A4 landscape; 
+        margin: 0; /* ブラウザのヘッダー/フッター余白をゼロに */
+    }
     
     .sheet {
         width: 297mm; height: 210mm; background: white;
         position: relative; overflow: hidden;
+        /* 画面表示用の装飾 */
         box-shadow: 0 0 20px rgba(0,0,0,0.5);
         margin-bottom: 30px;
         color: black;
+        /* 印刷時の改ページ指定 */
+        page-break-after: always;
     }
 
     /* グリッドコンテナ */
@@ -65,78 +61,73 @@
         position: absolute;
         top: calc(var(--margin-top) + var(--offset-y));
         right: calc(var(--margin-right) - var(--offset-x));
-        
         width: calc(var(--cell-w) * 9);
         height: calc(var(--cell-h) * 8);
-        
         display: grid;
-        direction: rtl; /* 右から左へ */
+        direction: rtl; 
         grid-template-columns: repeat(9, var(--cell-w));
         grid-template-rows: repeat(8, var(--cell-h));
         grid-auto-flow: column; 
     }
 
-    /* セル (1ラベル) */
+    /* セル */
     .cell {
         width: var(--cell-w); height: var(--cell-h);
         position: relative;
         border: 0.5px dotted #eee;
         box-sizing: border-box;
-        
-        /* セル自体がフレックスコンテナとなり、中身(CenterAxis)をど真ん中に置く */
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        display: flex; justify-content: center; align-items: center;
     }
     .cell:hover { background-color: #f0f8ff; cursor: text; }
 
-    /* ★重要: 中心軸 (Anchor) */
-    /* これが Pythonコードにおける (x, y) の点になります */
+    /* 中心軸 (Anchor) */
     .center-axis {
-        position: relative;
-        width: 0px;
-        height: 0px;
-        /* 可視化用 (デバッグ時のみ) */
-        /* outline: 1px solid red; */
+        position: relative; width: 0px; height: 0px;
     }
 
     /* 文字ブロック共通 */
     .label-text-wrapper {
         position: absolute;
         top: 0;
-        /* 文字ブロックの中心をアンカー位置に合わせる */
         transform: translate(-50%, -50%);
-        
         writing-mode: vertical-rl;
         text-orientation: upright;
-        white-space: pre; /* 改行を有効化 */
-        
+        white-space: pre; 
         font-family: "HeiseiMin-W3", "Hiragino Mincho ProN", serif;
         font-size: var(--base-font-size);
         line-height: 1.0;
-        
         outline: none;
         min-width: 1em; min-height: 1em;
-        text-align: center; /* 複数行の時の行揃え */
+        text-align: center;
     }
     .label-text-wrapper:focus { background: #e8f0fe; z-index: 10; }
 
-    /* 表面 (右側へシフト) = x + mirroring_distance */
-    .text-plus {
-        left: var(--mirror-dist);
-    }
-    
-    /* 裏面 (左側へシフト) = x - mirroring_distance */
-    .text-minus {
-        left: calc(var(--mirror-dist) * -1);
-    }
+    .text-plus { left: var(--mirror-dist); }
+    .text-minus { left: calc(var(--mirror-dist) * -1); }
 
-    /* 印刷時のスタイル */
+    /* --- 印刷時のスタイル (重要修正) --- */
     @media print {
-        body { background: white; margin: 0; }
-        #controls, #previewArea { padding: 0; background: white; display: block; }
+        body, html { 
+            width: 100%; height: 100%; margin: 0; padding: 0; background: white; 
+        }
+        #controls, #previewArea { 
+            padding: 0; margin: 0; background: white; display: block; 
+        }
         #controls { display: none !important; }
-        .sheet { margin: 0; box-shadow: none; page-break-after: always; }
+        
+        .sheet { 
+            margin: 0 !important; /* 余白除去 */
+            box-shadow: none; 
+            page-break-after: always;
+            border: none;
+            overflow: hidden; /* はみ出し防止 */
+        }
+        
+        /* 最後のページだけは改ページしない（空白ページ防止） */
+        .sheet:last-of-type {
+            page-break-after: auto;
+        }
+
         .cell { border: none; background: none !important; }
         .label-text-wrapper { background: none !important; }
     }
@@ -166,10 +157,8 @@
     <div class="control-row" style="font-size: 0.85rem; color: #ddd;">
         <label>開始位置: <input type="number" id="startPos" value="0" min="0" onchange="render()"></label>
         <span style="margin: 0 10px;">|</span>
-        
-        <label>中心からの距離: <input type="range" id="distRange" min="3" max="10" step="0.1" value="6.1" oninput="updateStyles()"></label>
+        <label>中心距離: <input type="range" id="distRange" min="3" max="10" step="0.1" value="6.1" oninput="updateStyles()"></label>
         <span id="distVal">6.1</span>mm
-        
         <span style="margin: 0 10px;">|</span>
         <label>横補正: <input type="range" id="xRange" min="-20" max="20" step="0.5" value="0" oninput="updateStyles()"></label>
         <label>縦補正: <input type="range" id="yRange" min="-20" max="20" step="0.5" value="0" oninput="updateStyles()"></label>
@@ -183,7 +172,7 @@
 let csvData = [];
 const rows = 9; 
 const cols = 8;
-const BASE_SIZE_MM = 3.3; // Python: size = 3.3 * mm
+const BASE_SIZE_MM = 3.3; 
 
 window.onload = function() {
     loadSample();
@@ -195,60 +184,50 @@ function updateStyles() {
     const dist = document.getElementById('distRange').value;
     document.getElementById('distVal').innerText = dist;
     
-    // CSS変数を更新 (中心からの絶対距離)
     root.style.setProperty('--mirror-dist', dist + 'mm');
     root.style.setProperty('--offset-x', document.getElementById('xRange').value + 'mm');
     root.style.setProperty('--offset-y', document.getElementById('yRange').value + 'mm');
 }
 
-// --- Pythonロジック準拠のフォントサイズ計算 ---
+// --- フォントサイズ計算 ---
 function updateFontSize(element, text) {
     if (!text) {
         element.style.fontSize = `${BASE_SIZE_MM}mm`;
         return;
     }
-
-    // Python: lines = text.split('\n')
-    // HTML上ではinnerTextで改行を取得
     const lines = text.split(/\r\n|\n|\r/);
-    
-    // Python: maxlinelen = max(map(len, lines))
     let maxlinelen = 0;
     lines.forEach(line => {
         if (line.length > maxlinelen) maxlinelen = line.length;
     });
 
-    // Python: if maxlinelen > 5: size = size * 5 / maxlinelen
     let size = BASE_SIZE_MM;
     if (maxlinelen > 5) {
         size = BASE_SIZE_MM * 5 / maxlinelen;
     }
-
     element.style.fontSize = `${size}mm`;
 }
 
 // --- 同期処理 ---
 function handleInput(e) {
     const target = e.target;
-    const parent = target.parentElement; // .center-axis
+    const parent = target.parentElement; 
     const isPlus = target.classList.contains('text-plus');
-    
     const text = target.innerText;
+    
     updateFontSize(target, text);
 
     if (document.getElementById('syncCheck').checked) {
-        // 対になる要素を探す
         const pair = isPlus ? parent.querySelector('.text-minus') : parent.querySelector('.text-plus');
         if (pair) {
-            pair.innerText = text; // HTMLではなくTextとしてコピー
+            pair.innerText = text;
             updateFontSize(pair, text);
         }
     }
 }
 
-// --- データロード関連 ---
+// --- データロード ---
 function loadSample() {
-    // 2行テスト用データ
     const data = "ID,科目名\n1,現金\n2,当座\n預金\n3,普通\n預金\n4,減価償却\n累計額\n5,売掛金";
     csvData = parseCSV(data);
     render();
@@ -285,7 +264,6 @@ function render() {
     
     const startPos = parseInt(document.getElementById('startPos').value) || 0;
     const itemsPerPage = rows * cols; // 72
-    
     const totalSlotsNeeded = startPos + csvData.length;
     const pageCount = Math.max(1, Math.ceil(totalSlotsNeeded / itemsPerPage));
     
@@ -302,40 +280,31 @@ function render() {
             const cell = document.createElement('div');
             cell.className = 'cell';
             
-            // データ取得
             let initialText = "";
             if (i >= startPos && dataIndex < csvData.length) {
-                // CSV内のリテラルな"\n"文字列を本当の改行コードに変換
                 initialText = csvData[dataIndex].replace(/\\n/g, '\n'); 
                 dataIndex++;
             }
 
-            // ★中心軸 (Anchor)
-            // ここがPythonでいう (x, y) の位置
             const anchor = document.createElement('div');
             anchor.className = 'center-axis';
 
-            // --- 表面 (Plus / Right) ---
             const textPlus = document.createElement('div');
             textPlus.className = 'label-text-wrapper text-plus';
             textPlus.contentEditable = true; 
             textPlus.innerText = initialText;
             
-            // --- 裏面 (Minus / Left) ---
             const textMinus = document.createElement('div');
             textMinus.className = 'label-text-wrapper text-minus';
             textMinus.contentEditable = true;
             textMinus.innerText = initialText;
             
-            // 初期サイズ計算
             updateFontSize(textPlus, initialText);
             updateFontSize(textMinus, initialText);
 
-            // イベントリスナー
             textPlus.addEventListener('input', handleInput);
             textMinus.addEventListener('input', handleInput);
             
-            // セルクリックでフォーカス
             cell.onclick = function(e) {
                 if (e.target === cell) textPlus.focus();
             };
