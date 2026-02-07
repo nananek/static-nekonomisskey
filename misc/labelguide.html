@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>位置ガイド (点のみ)</title>
+<style>
+    body { margin: 0; padding: 0; background: #eee; font-family: sans-serif; }
+
+    /* コントロールバー */
+    #controls {
+        position: sticky; top: 0; background: #333; color: white; padding: 10px;
+        display: flex; gap: 20px; align-items: center; z-index: 100;
+        font-size: 0.9rem;
+    }
+    input { width: 50px; padding: 4px; text-align: right; }
+    button { padding: 5px 15px; cursor: pointer; font-weight: bold; }
+
+    /* プレビューエリア */
+    #preview {
+        padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 20px;
+    }
+
+    /* 用紙設定 (A4 縦) */
+    @page { size: A4 portrait; margin: 0; }
+    .sheet {
+        width: 210mm; height: 297mm; background: white;
+        position: relative; overflow: hidden;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        page-break-after: always;
+    }
+
+    /* 点 (・) のスタイル */
+    .dot {
+        position: absolute;
+        right: 0; /* 右端ピッタリ */
+        width: 2mm; height: 1px; /* 極小の横棒のような点 */
+        background: #000;
+        /* もし完全な「丸」が良い場合は以下を有効化 */
+        /* width: 2mm; height: 2mm; border-radius: 50%; transform: translate(50%, -50%); */
+    }
+
+    @media print {
+        body { background: white; }
+        #controls { display: none; }
+        #preview { padding: 0; margin: 0; display: block; }
+        .sheet { margin: 0; box-shadow: none; }
+    }
+</style>
+</head>
+<body>
+
+<div id="controls">
+    <label>総ページ数 <input type="number" id="totalPages" value="12" min="1" onchange="render()"></label>
+    <label>山の数(周回) <input type="number" id="loopCount" value="12" min="1" onchange="render()"></label>
+    <label>ラベル高さ(mm) <input type="number" id="pitch" value="23" step="0.5" onchange="render()"></label>
+    <label>開始位置(mm) <input type="number" id="startTop" value="0" min="0" onchange="render()"></label>
+    <button onclick="window.print()">印刷</button>
+</div>
+
+<div id="preview"></div>
+
+<script>
+window.onload = render;
+
+function render() {
+    const container = document.getElementById('preview');
+    container.innerHTML = "";
+
+    const totalPages = parseInt(document.getElementById('totalPages').value) || 1;
+    const loopCount = parseInt(document.getElementById('loopCount').value) || 12;
+    const pitch = parseFloat(document.getElementById('pitch').value) || 23;
+    const startTop = parseFloat(document.getElementById('startTop').value) || 0;
+
+    for (let i = 0; i < totalPages; i++) {
+        const sheet = document.createElement('div');
+        sheet.className = 'sheet';
+
+        // 位置計算: (ページ番号 % 山の数)
+        const posIndex = i % loopCount;
+        
+        // 中心座標: 開始位置 + (個数 * 高さ) + (高さ / 2)
+        const centerY = startTop + (posIndex * pitch) + (pitch / 2);
+
+        const dot = document.createElement('div');
+        dot.className = 'dot';
+        // 点を右端、計算した高さの中心に配置
+        dot.style.top = centerY + 'mm'; 
+
+        sheet.appendChild(dot);
+        container.appendChild(sheet);
+    }
+}
+</script>
+</body>
+</html>
