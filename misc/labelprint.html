@@ -3,15 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>インデックスラベル印刷ツール</title>
+<title>インデックスラベル印刷ツール (Final)</title>
 <style>
-    /* --- 設定変数 (Pythonロジック準拠) --- */
+    /* --- 設定変数 --- */
     :root {
-        --mirror-dist: 6.1mm;  /* 折り目から文字中心までの距離 */
-        --offset-x: 0mm;       /* 全体の横位置補正 */
-        --offset-y: 0mm;       /* 全体の縦位置補正 */
-        
-        /* A4横・ニチバンマイタック(ML-132)想定のグリッド */
+        --mirror-dist: 6.1mm; 
+        --offset-x: 0mm;
+        --offset-y: 0mm;
         --cell-w: 31.5mm; 
         --cell-h: 24.8mm;
         --margin-top: 2.2mm;   
@@ -24,20 +22,26 @@
     
     /* コントロールバー */
     #controls {
-        background: #fff; border-bottom: 1px solid #ddd; padding: 12px 24px;
+        background: #fff; border-bottom: 1px solid #ddd; padding: 10px 20px;
         position: sticky; top: 0; z-index: 100;
         box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+        display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between;
     }
     
-    .divider { height: 24px; width: 1px; background: #ddd; margin: 0 4px; }
+    .ctrl-section { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .ctrl-group-box { 
+        display: flex; align-items: center; gap: 10px; 
+        background: #f8f9fa; padding: 4px 10px; border-radius: 6px; border: 1px solid #eee;
+    }
+    
+    .divider { height: 24px; width: 1px; background: #ddd; margin: 0 2px; }
     
     button { 
-        padding: 8px 16px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; 
+        padding: 6px 12px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; 
         font-weight: 600; background: #fff; color: #444; font-size: 0.85rem; transition: 0.2s; 
-        display: inline-flex; align-items: center; gap: 6px;
+        white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
     }
-    button:hover { background: #f9f9f9; border-color: #bbb; }
+    button:hover { background: #f0f0f0; border-color: #bbb; }
     button:active { transform: translateY(1px); }
     
     button.primary { background: #007bff; color: white; border-color: #007bff; }
@@ -45,18 +49,22 @@
     button.success { background: #28a745; color: white; border-color: #28a745; }
     button.success:hover { background: #218838; }
 
-    input[type="number"] { width: 60px; padding: 6px; border-radius: 4px; border: 1px solid #ccc; text-align: right; font-family: monospace; }
-    label { font-size: 0.85rem; font-weight: bold; color: #555; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; }
-    .unit { font-size: 0.75rem; color: #888; margin-left: 2px; }
+    /* 数値入力 */
+    input[type="number"] { 
+        width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #ccc; 
+        text-align: right; font-family: monospace; font-weight: bold;
+    }
+    label { font-size: 0.85rem; font-weight: bold; color: #555; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .unit { font-size: 0.75rem; color: #888; }
 
     /* --- プレビューエリア --- */
     #previewArea {
         padding: 40px; min-height: calc(100vh - 80px);
         display: flex; justify-content: center; flex-direction: column; align-items: center;
-        user-select: none; /* 右クリックメニュー制御のため */
+        user-select: none; 
     }
 
-    /* --- 用紙設定 (A4 Landscape) --- */
+    /* --- 用紙設定 --- */
     @page { size: A4 landscape; margin: 0; }
     
     .sheet {
@@ -66,15 +74,13 @@
         margin-bottom: 40px;
     }
 
-    /* グリッドレイアウト (右から左、縦優先) */
     .grid-container {
         position: absolute;
         top: calc(var(--margin-top) + var(--offset-y));
         right: calc(var(--margin-right) - var(--offset-x));
         width: calc(var(--cell-w) * 9); 
         height: calc(var(--cell-h) * 8);
-        display: grid; 
-        direction: rtl; 
+        display: grid; direction: rtl; 
         grid-template-columns: repeat(9, var(--cell-w));
         grid-template-rows: repeat(8, var(--cell-h));
         grid-auto-flow: column; 
@@ -86,26 +92,24 @@
         box-sizing: border-box; display: flex; justify-content: center; align-items: center;
     }
     .cell:hover { background-color: #f0f8ff; cursor: context-menu; }
-    .cell.active-target { background-color: #e3f2fd; } /* 右クリック時の強調 */
+    .cell.active-target { background-color: #e3f2fd; }
 
-    /* 中心軸とテキスト */
     .center-axis { position: relative; width: 0; height: 0; }
     
     .label-text-wrapper {
         position: absolute; top: 0; transform: translate(-50%, -50%);
         writing-mode: vertical-rl; text-orientation: upright;
-        white-space: pre; /* 改行を反映 */
+        white-space: pre; 
         font-family: "HeiseiMin-W3", "Hiragino Mincho ProN", "Yu Mincho", serif;
         font-size: var(--base-font-size); line-height: 1.0;
         outline: none; min-width: 1em; min-height: 1em; text-align: center;
     }
     .label-text-wrapper:focus { background: #e8f0fe; z-index: 10; border-radius: 2px; cursor: text; }
     
-    /* 左右配置 */
     .text-plus { left: var(--mirror-dist); }
     .text-minus { left: calc(var(--mirror-dist) * -1); }
 
-    /* --- モーダル (リスト編集用) --- */
+    /* --- モーダル --- */
     #editModal {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0,0,0,0.5); z-index: 2000;
@@ -128,14 +132,12 @@
         display: flex; border-bottom: 1px solid #eee; padding: 4px 8px; background: white; align-items: start;
     }
     .list-idx { width: 30px; color: #aaa; font-size: 0.75rem; padding-top: 10px; text-align: center; }
-    
     .list-input { 
         flex-grow: 1; padding: 8px; border: 1px solid transparent; border-radius: 4px; 
         font-family: inherit; font-size: 0.95rem; resize: none; overflow: hidden; min-height: 2.4em;
         line-height: 1.2;
     }
     .list-input:focus { border-color: #007bff; outline: none; background: #fdfdfd; }
-    
     .list-del { 
         color: #dc3545; cursor: pointer; padding: 8px; opacity: 0.3; transition: 0.2s; display: flex; align-items: center; 
     }
@@ -156,14 +158,11 @@
         body, html { width: 100%; height: 100%; margin: 0; background: white; }
         #controls, #contextMenu, #editModal { display: none !important; }
         #previewArea { padding: 0 !important; margin: 0 !important; background: white; display: block !important; height: auto !important; }
-        
         .sheet { 
             margin: 0 !important; box-shadow: none; border: none; overflow: hidden; 
             page-break-after: always; break-after: page; 
         }
-        /* 最後のページの空白防止 */
         .sheet:last-child { page-break-after: auto; break-after: auto; margin-bottom: 0 !important; }
-        
         .cell { border: none; background: none !important; }
         .label-text-wrapper { background: none !important; }
     }
@@ -172,7 +171,7 @@
 <body>
 
 <div id="controls">
-    <div class="control-group">
+    <div class="ctrl-section">
         <button class="primary" onclick="openEditModal()">📝 リスト編集</button>
         <button onclick="document.getElementById('csvFile').click()">📂 CSV読込</button>
         <input type="file" id="csvFile" accept=".csv" onchange="loadCSV(this)" style="display:none;">
@@ -180,24 +179,21 @@
         <button onclick="clearAll()">クリア</button>
     </div>
 
-    <div class="divider"></div>
+    <div class="ctrl-section">
+        <div class="ctrl-group-box">
+            <label>開始位置 <input type="number" id="startPos" value="0" min="0" onchange="render()"></label>
+        </div>
 
-    <div class="control-group">
-        <label title="入力内容を裏面に自動反映します"><input type="checkbox" id="syncCheck" checked> 両面同期</label>
-        <label style="margin-left:10px;">開始位置 <input type="number" id="startPos" value="0" min="0" onchange="render()"></label>
+        <div class="ctrl-group-box">
+            <label>中心 <input type="number" id="distInput" value="6.1" step="0.1" onchange="updateStyles()"><span class="unit">mm</span></label>
+            <div class="divider"></div>
+            <label>X <input type="number" id="xInput" value="0.0" step="0.1" onchange="updateStyles()"><span class="unit">mm</span></label>
+            <div class="divider"></div>
+            <label>Y <input type="number" id="yInput" value="0.0" step="0.1" onchange="updateStyles()"><span class="unit">mm</span></label>
+        </div>
     </div>
 
-    <div class="divider"></div>
-
-    <div class="control-group">
-        <label>中心 <input type="number" id="distInput" value="6.1" step="0.1" onchange="updateStyles()"></label><span class="unit">mm</span>
-        <label>X <input type="number" id="xInput" value="0.0" step="0.1" onchange="updateStyles()"></label><span class="unit">mm</span>
-        <label>Y <input type="number" id="yInput" value="0.0" step="0.1" onchange="updateStyles()"></label><span class="unit">mm</span>
-    </div>
-
-    <div style="flex-grow: 1;"></div>
-
-    <div class="control-group">
+    <div class="ctrl-section" style="margin-left: auto;">
         <button class="success" onclick="window.print()">🖨 印刷</button>
     </div>
 </div>
@@ -214,7 +210,7 @@
 <div id="editModal">
     <div id="editModalContent">
         <div class="modal-header">リスト一括編集</div>
-        <div class="modal-desc">科目を編集できます。長い科目は改行してください。<br>（6文字以下は1行、7文字以上は改行推奨）</div>
+        <div class="modal-desc">科目を編集できます。長い科目はEnterキーで改行してください。<br>（6文字以下は1行、7文字以上は改行を推奨）</div>
         
         <div class="list-editor" id="listEditorBody"></div>
         
@@ -237,9 +233,7 @@ const BASE_SIZE_MM = 3.3;
 
 // --- 初期化 ---
 window.onload = function() {
-    loadSample(); // サンプル初期ロード
-    
-    // UIイベントリスナー
+    loadSample(); 
     document.addEventListener('click', function(e) {
         document.getElementById('contextMenu').style.display = 'none';
         document.querySelectorAll('.active-target').forEach(el => el.classList.remove('active-target'));
@@ -276,10 +270,6 @@ function menuAction(action) {
     const startPos = parseInt(document.getElementById('startPos').value) || 0;
     let dataIdx = contextTargetIndex - startPos;
 
-    // 使いさしエリア(startPos未満)に対する操作ガード
-    // dataIdx < 0 の場合、配列外なので本来操作できないが、
-    // ここでは単純に配列操作のみ行う（視覚的に空欄に見える場所への操作は無視される）
-    
     if (action === 'insert') {
         ensureArrayLength(dataIdx);
         labelData.splice(dataIdx, 0, "");
@@ -314,7 +304,6 @@ function openEditModal() {
     const body = document.getElementById('listEditorBody');
     body.innerHTML = "";
     labelData.forEach((text, i) => addListRowUI(body, i, text));
-    // 空なら1行追加
     if(labelData.length === 0) addListRowUI(body, 0, "");
     document.getElementById('editModal').style.display = 'flex';
 }
@@ -327,7 +316,6 @@ function addListRowUI(container, index, text) {
         <textarea class="list-input" rows="1"></textarea>
         <div class="list-del" title="削除" onclick="this.parentElement.remove()">✕</div>
     `;
-    // Textareaに値をセット（自動高さ調整は簡易的にCSSでmin-height指定）
     div.querySelector('textarea').value = text;
     container.appendChild(div);
 }
@@ -394,18 +382,16 @@ function parseCSV(text) {
     return list;
 }
 
-// --- 描画・レイアウトロジック (Python準拠) ---
+// --- 描画・レイアウトロジック ---
 function updateFontSize(element, text) {
     if (!text) { element.style.fontSize = `${BASE_SIZE_MM}mm`; return; }
     
-    // 行ごとに分割して最大長を計測
     const lines = text.split(/\n/);
     let maxLen = 0;
     lines.forEach(line => { if (line.length > maxLen) maxLen = line.length; });
     
     let size = BASE_SIZE_MM;
     if (maxLen > 5) { 
-        // 6文字以上で縮小
         size = BASE_SIZE_MM * 5 / maxLen; 
     }
     element.style.fontSize = `${size}mm`;
@@ -430,14 +416,12 @@ function handleInput(e) {
     // サイズ調整
     updateFontSize(target, text);
     
-    // 同期処理
-    if (document.getElementById('syncCheck').checked) {
-        const isPlus = target.classList.contains('text-plus');
-        const pair = isPlus ? target.parentElement.querySelector('.text-minus') : target.parentElement.querySelector('.text-plus');
-        if (pair && pair.innerText !== text) {
-            pair.innerText = text;
-            updateFontSize(pair, text);
-        }
+    // 強制同期 (Checkbox判定なし)
+    const isPlus = target.classList.contains('text-plus');
+    const pair = isPlus ? target.parentElement.querySelector('.text-minus') : target.parentElement.querySelector('.text-plus');
+    if (pair && pair.innerText !== text) {
+        pair.innerText = text;
+        updateFontSize(pair, text);
     }
 }
 
@@ -447,7 +431,6 @@ function render() {
     
     const startPos = parseInt(document.getElementById('startPos').value) || 0;
     const totalSlots = startPos + labelData.length;
-    // データ数に応じてページ作成 (最低1ページ)
     const pageCount = Math.max(1, Math.ceil(totalSlots / itemsPerPage));
     
     for (let p = 0; p < pageCount; p++) {
@@ -462,17 +445,14 @@ function render() {
             cell.className = 'cell';
             cell.dataset.index = globalIdx;
             
-            // 右クリックメニュー
             cell.addEventListener('contextmenu', (e) => showContextMenu(e, globalIdx));
 
-            // 表示データ決定
             let text = "";
             const dataIdx = globalIdx - startPos;
             if (dataIdx >= 0 && dataIdx < labelData.length) {
                 text = labelData[dataIdx];
             }
 
-            // 要素構築
             const anchor = document.createElement('div');
             anchor.className = 'center-axis';
 
@@ -486,15 +466,12 @@ function render() {
             textMinus.contentEditable = true;
             textMinus.innerText = text;
             
-            // 初期状態反映
             updateFontSize(textPlus, text);
             updateFontSize(textMinus, text);
 
-            // 編集イベント
             textPlus.addEventListener('input', handleInput);
             textMinus.addEventListener('input', handleInput);
             
-            // クリック補助
             cell.onclick = function(e) {
                 if (e.target === cell) textPlus.focus();
             };
