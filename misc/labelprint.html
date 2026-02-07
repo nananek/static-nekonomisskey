@@ -1,128 +1,330 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <style>
-        @page { size: A4; margin: 0; }
-        body { font-family: "Hiragino Mincho ProN", serif; background: #525659; margin: 0; padding: 20px; }
-        #controls { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        @media print { #controls { display: none; } body { background: white; padding: 0; } }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>総勘定元帳ラベル印刷ツール</title>
+<style>
+    /* --- 基本設定 --- */
+    body { font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+    
+    /* --- 操作パネル (印刷時は消える) --- */
+    #controls {
+        background: white; padding: 20px; border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 900px; margin: 0 auto 30px;
+    }
+    .panel-row { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+    .panel-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    
+    h2 { margin: 0 0 10px 0; font-size: 1.2rem; color: #444; }
+    label { font-weight: bold; font-size: 0.9rem; }
+    input[type="number"] { width: 50px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+    input[type="file"] { font-size: 0.9rem; }
+    
+    button {
+        padding: 8px 16px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s;
+    }
+    .btn-blue { background: #007bff; color: white; }
+    .btn-green { background: #28a745; color: white; }
+    .btn-gray { background: #6c757d; color: white; }
+    button:hover { opacity: 0.9; }
 
-        .sheet {
-            width: 210mm; height: 297mm; background: white; margin: 0 auto;
-            display: grid; padding-top: 20mm; padding-left: 15mm;
-            grid-template-columns: repeat(9, 21mm); 
-            grid-template-rows: repeat(8, 28mm);
-            gap: 2mm 3mm; box-sizing: border-box; page-break-after: always;
-        }
-
-        .label {
-            width: 21mm; height: 28mm; display: flex; flex-direction: column;
-            justify-content: space-around; align-items: center;
-            border: 0.1mm dotted #ccc; box-sizing: border-box;
-            writing-mode: vertical-rl; text-orientation: upright;
-        }
-
-        /* 表と裏のエリア */
-        .side {
-            display: flex; justify-content: center; align-items: center;
-            height: 45%; width: 100%; overflow: hidden;
-            outline: none; line-height: 1.2; white-space: pre-wrap; /* 改行許可 */
-        }
+    /* --- 印刷プレビューエリア --- */
+    @page { size: A4; margin: 0; }
+    
+    /* シート設定（ニチバン マイタック ML-132RR/BR A4版 中サイズ 23x29mm 9列x8段 想定） */
+    .sheet {
+        width: 210mm; height: 297mm; background: white; margin: 0 auto 30px;
+        display: grid;
+        /* 余白調整: プリンタによって微調整が必要な場合はここを変更 */
+        padding-top: 19mm; 
+        padding-left: 15mm;
         
-        /* 折り返し地点のガイド（印刷時は消える） */
-        .fold-line { border-top: 1px dashed #eee; width: 100%; height: 0; }
+        grid-template-columns: repeat(9, 23mm);
+        grid-template-rows: repeat(8, 29mm);
+        gap: 0mm; /* セル自体に余白を持たせるためgapは0でも可、製品による */
+        
+        box-sizing: border-box;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        page-break-after: always;
+    }
 
-        .label:empty { background: none; }
-        @media print { .label { border: none; } .fold-line { border: none; } }
-    </style>
+    /* ラベル個別の設定 */
+    .label {
+        width: 23mm; height: 29mm;
+        display: flex; justify-content: center; align-items: center;
+        
+        /* 縦書き設定 */
+        writing-mode: vertical-rl;
+        text-orientation: upright;
+        
+        font-size: 10.5pt; /* 文字サイズ */
+        line-height: 1.1;
+        
+        border: 1px dotted #e0e0e0; /* 画面確認用の枠線 */
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+    
+    /* 空白ラベルの見た目 */
+    .label.empty-slot { background: #f9f9f9; }
+
+    /* --- 印刷時の挙動 --- */
+    @media print {
+        body { background: white; padding: 0; }
+        #controls { display: none; }
+        .sheet { margin: 0; box-shadow: none; }
+        .label { border: none; } /* 枠線を消す */
+        .label.empty-slot { background: none; } /* 背景色を消す */
+    }
+</style>
 </head>
 <body>
 
 <div id="controls">
-    <h3>総勘定元帳インデックス作成</h3>
-    <input type="file" id="csvFile" accept=".csv"> 
-    列: <input type="number" id="colIdx" value="1" min="1" style="width:40px;"> 
-    開始位置(1〜72): <input type="number" id="startPos" value="1" min="1" style="width:50px;">
-    <button onclick="generateLabels()">CSV読み込み</button>
-    <p><small>※ラベル内を直接クリックして編集・改行（Enter）できます。表を書き換えると裏も同期します。</small></p>
+    <div class="panel-row">
+        <div>
+            <h2>1. データの準備</h2>
+            <button class="btn-gray" onclick="downloadCSV()">現在データをCSVで保存</button>
+        </div>
+        <div style="flex-grow: 1; text-align: right;">
+            <p style="font-size: 0.8rem; margin:0;">初期状態で「サンプル科目」が入っています。<br>編集したい場合はダウンロードしてください。</p>
+        </div>
+    </div>
+
+    <div class="panel-row">
+        <div>
+            <h2>2. 読み込み設定</h2>
+            <input type="file" id="csvFile" accept=".csv" onchange="handleFileSelect()">
+            <label>列番号: <input type="number" id="colIdx" value="2" min="1"></label>
+            <span style="font-size:0.8rem; color:#666;">(B列なら2)</span>
+        </div>
+        <div style="margin-left: auto;">
+             <label>エンコード: 
+                <select id="encoding">
+                    <option value="UTF-8">UTF-8 (標準)</option>
+                    <option value="Shift_JIS">Shift_JIS (Excel)</option>
+                </select>
+            </label>
+        </div>
+    </div>
+
+    <div class="panel-row">
+        <div>
+            <h2>3. 印刷調整</h2>
+            <label>開始位置: <input type="number" id="startPos" value="1" min="1" max="72"></label>
+            <span style="font-size:0.8rem; color:#666;">(使いかけのシート用)</span>
+        </div>
+        <div style="margin-left: auto;">
+            <button class="btn-blue" onclick="renderLabels()">プレビュー更新</button>
+            <button class="btn-green" onclick="window.print()">印刷する</button>
+        </div>
+    </div>
 </div>
 
 <div id="printArea"></div>
 
 <script>
-function generateLabels() {
-    const fileInput = document.getElementById('csvFile');
-    const colIdx = parseInt(document.getElementById('colIdx').value) - 1;
-    const startPos = parseInt(document.getElementById('startPos').value) - 1;
+// --- 初期データ (サンプル科目) ---
+const defaultCSVData = `ID,科目名,備考
+101,現金,
+102,小口現金,
+103,当座預金,
+104,普通預金,
+105,定期預金,
+110,受取手形,
+111,売掛金,
+120,有価証券,
+130,棚卸資産,
+131,商品,
+132,製品,
+133,仕掛品,
+134,原材料,
+135,貯蔵品,
+140,前払金,
+141,前払費用,
+142,立替金,
+143,仮払金,
+144,貸付金,
+145,受取利息,
+201,建物,
+202,建物附属設備,
+203,構築物,
+204,機械装置,
+205,車両運搬具,
+206,工具器具備品,
+207,一括償却資産,
+208,土地,
+209,建設仮勘定,
+210,減価償却累計額,
+220,ソフトウェア,
+221,特許権,
+222,電話加入権,
+230,投資有価証券,
+231,長期貸付金,
+232,敷金・保証金,
+301,支払手形,
+302,買掛金,
+303,短期借入金,
+304,未払金,
+305,未払費用,
+306,未払法人税等,
+307,前受金,
+308,預り金,
+309,仮受金,
+320,長期借入金,
+321,退職給付引当金,
+401,資本金,
+402,資本準備金,
+403,利益準備金,
+404,繰越利益剰余金,
+501,売上高,
+502,雑収入,
+601,仕入高,
+602,外注加工費,
+701,役員報酬,
+702,給料手当,
+703,賞与,
+704,法定福利費,
+705,福利厚生費,
+706,外注工賃,
+707,荷造運賃,
+708,水道光熱費,
+709,旅費交通費,
+710,通信費,
+711,広告宣伝費,
+712,接待交際費,
+713,損害保険料,
+714,修繕費,
+715,消耗品費,
+716,減価償却費,
+717,租税公課,
+718,新聞図書費,
+719,諸会費,
+720,支払手数料,
+721,車両費,
+722,地代家賃,
+723,賃借料,
+724,寄付金,
+725,雑費,
+801,受取利息,
+802,受取配当金,
+810,支払利息,
+811,手形売却損,
+999,法人税等,`;
+
+// 現在保持しているリストデータ
+let currentList = [];
+
+// --- 初期化処理 ---
+window.onload = function() {
+    // デフォルトデータをパースして表示
+    parseCSV(defaultCSVData);
+    renderLabels();
+};
+
+// --- CSVダウンロード機能 ---
+function downloadCSV() {
+    // BOMを付与してExcelで文字化けしないようにする (UTF-8)
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+    // currentListが空ならデフォルトデータを使う、そうでなければ再構築（今回は簡易的にデフォルトデータをDL）
+    // ※実用上、読み込んだデータがあるならそれをDLすべきですが、簡易化のためファイル選択前はデフォルトをDL
     
+    let content = defaultCSVData;
+    
+    // もしファイル読み込み後なら、currentListからCSVを再構成することも可能だが
+    // ここでは「元データをDL」とする
+    
+    const blob = new Blob([bom, content], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'account_titles.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+// --- CSV読み込み処理 ---
+function handleFileSelect() {
+    const fileInput = document.getElementById('csvFile');
+    const encoding = document.getElementById('encoding').value;
+    
+    if (!fileInput.files[0]) return;
+
     const reader = new FileReader();
     reader.onload = function(e) {
-        const lines = e.target.result.split(/\r\n|\n/);
-        const titles = lines.map(line => {
-            const cols = line.split(',');
-            return cols[colIdx] ? cols[colIdx].trim() : "";
-        }).filter(t => t !== "");
-
-        renderSheet(titles, startPos);
+        const text = e.target.result;
+        parseCSV(text);
+        renderLabels(); // 読み込み完了後に再描画
     };
-    reader.readAsText(fileInput.files[0], 'Shift-JIS');
+    
+    // Shift_JIS指定の場合のみ対応（モダンブラウザはTextDecoder推奨だが簡易実装）
+    reader.readAsText(fileInput.files[0], encoding);
 }
 
-function renderSheet(titles, start) {
+// --- CSVパース処理 ---
+function parseCSV(text) {
+    const lines = text.split(/\r\n|\n/);
+    const colIdx = parseInt(document.getElementById('colIdx').value) - 1;
+    
+    // 1行目はヘッダーとしてスキップ、指定列を取得
+    const titles = lines.slice(1).map(line => {
+        const cols = line.split(',');
+        // ダブルクォート除去などの正規化は簡易版
+        let val = cols[colIdx] ? cols[colIdx].trim() : "";
+        val = val.replace(/^"|"$/g, ''); 
+        return val;
+    }).filter(val => val !== "");
+    
+    currentList = titles;
+}
+
+// --- 描画処理 (メイン) ---
+function renderLabels() {
+    const startPos = parseInt(document.getElementById('startPos').value) - 1;
     const printArea = document.getElementById('printArea');
     printArea.innerHTML = "";
-    let currentSheet = createSheet();
-    printArea.appendChild(currentSheet);
+    
+    const itemsPerPage = 72; // 9列 x 8行
+    let totalItems = startPos + currentList.length;
+    let sheetCount = Math.ceil(totalItems / itemsPerPage);
+    if (sheetCount === 0) sheetCount = 1;
 
-    // 空白埋め
-    for (let i = 0; i < start; i++) {
-        currentSheet.appendChild(createLabelElement(""));
-    }
+    let itemIndex = 0; // データリストのインデックス
 
-    // データ埋め
-    titles.forEach((title, index) => {
-        if ((start + index) > 0 && (start + index) % 72 === 0) {
-            currentSheet = createSheet();
-            printArea.appendChild(currentSheet);
+    for (let s = 0; s < sheetCount; s++) {
+        const sheet = document.createElement('div');
+        sheet.className = 'sheet';
+        
+        for (let i = 0; i < itemsPerPage; i++) {
+            const globalIndex = (s * itemsPerPage) + i;
+            const div = document.createElement('div');
+            
+            if (globalIndex < startPos) {
+                // 開始位置より前（使いさし部分）
+                div.className = 'label empty-slot';
+            } else if (itemIndex < currentList.length) {
+                // データあり
+                div.className = 'label';
+                div.textContent = currentList[itemIndex];
+                
+                // 文字数によるフォントサイズ調整
+                if (currentList[itemIndex].length >= 6) {
+                    div.style.fontSize = "8pt";
+                    div.style.letterSpacing = "-1px";
+                } else if (currentList[itemIndex].length >= 5) {
+                    div.style.fontSize = "9pt";
+                }
+                
+                itemIndex++;
+            } else {
+                // データ切れ後の余白
+                div.className = 'label'; 
+            }
+            sheet.appendChild(div);
         }
-        currentSheet.appendChild(createLabelElement(title));
-    });
-}
-
-function createSheet() {
-    const div = document.createElement('div');
-    div.className = 'sheet';
-    return div;
-}
-
-function createLabelElement(text) {
-    const label = document.createElement('div');
-    label.className = 'label';
-    if (text === "") return label;
-
-    // 表側
-    const sideA = document.createElement('div');
-    sideA.className = 'side';
-    sideA.contentEditable = true;
-    sideA.textContent = text;
-
-    // 折り返し線
-    const line = document.createElement('div');
-    line.className = 'fold-line';
-
-    // 裏側
-    const sideB = document.createElement('div');
-    sideB.className = 'side';
-    sideB.textContent = text; // 初期値
-
-    // 同期処理：表(sideA)を編集したら裏(sideB)に反映
-    sideA.oninput = () => { sideB.textContent = sideA.textContent; };
-
-    label.appendChild(sideA);
-    label.appendChild(line);
-    label.appendChild(sideB);
-    return label;
+        printArea.appendChild(sheet);
+    }
 }
 </script>
 </body>
