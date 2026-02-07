@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>インデックスラベル作成</title>
+<title>インデックスラベル作成 Master (改行対応版)</title>
 <style>
     /* --- 設定変数 --- */
     :root {
@@ -47,7 +47,6 @@
     #previewArea {
         padding: 40px; min-height: calc(100vh - 100px);
         display: flex; justify-content: center; flex-direction: column; align-items: center;
-        /* 右クリックメニュー無効化 (独自メニュー用) */
         user-select: none; 
     }
 
@@ -57,9 +56,7 @@
         background: white; border: 1px solid #ccc; border-radius: 4px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.2); padding: 5px 0; min-width: 150px;
     }
-    #contextMenu div {
-        padding: 8px 15px; cursor: pointer; font-size: 0.9rem;
-    }
+    #contextMenu div { padding: 8px 15px; cursor: pointer; font-size: 0.9rem; }
     #contextMenu div:hover { background: #f0f0f0; }
     #contextMenu .menu-danger { color: #dc3545; }
 
@@ -90,7 +87,7 @@
         box-sizing: border-box; display: flex; justify-content: center; align-items: center;
     }
     .cell:hover { background-color: #f0f7ff; cursor: context-menu; }
-    .cell.active-target { background-color: #e3f2fd; } /* 右クリック時のハイライト */
+    .cell.active-target { background-color: #e3f2fd; } 
 
     /* テキスト配置 */
     .center-axis { position: relative; width: 0; height: 0; }
@@ -121,12 +118,17 @@
         flex-grow: 1; overflow-y: auto; border: 1px solid #ddd; margin: 10px 0;
     }
     .list-row {
-        display: flex; border-bottom: 1px solid #eee; padding: 5px; align-items: center;
+        display: flex; border-bottom: 1px solid #eee; padding: 5px; align-items: start; /* 上揃えに変更 */
     }
     .list-row:nth-child(even) { background: #f9f9f9; }
-    .list-idx { width: 40px; color: #888; font-size: 0.8rem; text-align: center; }
-    .list-input { flex-grow: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; }
-    .list-del { margin-left: 10px; color: #dc3545; cursor: pointer; padding: 5px; }
+    .list-idx { width: 40px; color: #888; font-size: 0.8rem; text-align: center; padding-top: 8px; }
+    
+    /* Textareaに変更 */
+    .list-input { 
+        flex-grow: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; 
+        font-family: inherit; resize: vertical; min-height: 38px;
+    }
+    .list-del { margin-left: 10px; color: #dc3545; cursor: pointer; padding: 8px; }
 
     /* --- 印刷時 --- */
     @media print {
@@ -185,7 +187,7 @@
 <div id="editModal">
     <div id="editModalContent">
         <div style="font-weight:bold; font-size:1.1rem; margin-bottom:10px;">リスト編集</div>
-        <div style="font-size:0.85rem; color:#666; margin-bottom:10px;">空欄は空白ラベルとして印刷されます。</div>
+        <div style="font-size:0.85rem; color:#666; margin-bottom:10px;">Enterキーで改行できます。</div>
         
         <div class="list-editor" id="listEditorBody"></div>
         
@@ -200,21 +202,19 @@
 
 <script>
 // --- グローバル変数 ---
-let labelData = []; // 文字列の配列 (これがマスターデータ)
-let contextTargetIndex = -1; // 右クリックされたセルのインデックス
+let labelData = []; // 文字列の配列 (マスターデータ)
+let contextTargetIndex = -1; 
 const rows = 9; const cols = 8;
 const itemsPerPage = rows * cols; // 72
 const BASE_SIZE_MM = 3.3; 
 
 window.onload = function() {
-    // クリックでメニューを閉じる
     document.addEventListener('click', function(e) {
         document.getElementById('contextMenu').style.display = 'none';
         document.querySelectorAll('.active-target').forEach(el => el.classList.remove('active-target'));
     });
 };
 
-// --- スタイル反映 ---
 function updateStyles() {
     const root = document.documentElement;
     root.style.setProperty('--mirror-dist', document.getElementById('distInput').value + 'mm');
@@ -222,12 +222,10 @@ function updateStyles() {
     root.style.setProperty('--offset-y', document.getElementById('yInput').value + 'mm');
 }
 
-// --- 右クリックメニュー処理 ---
+// --- 右クリック処理 ---
 function showContextMenu(e, index) {
     e.preventDefault();
     contextTargetIndex = index;
-    
-    // ハイライト
     document.querySelectorAll('.active-target').forEach(el => el.classList.remove('active-target'));
     e.currentTarget.classList.add('active-target');
 
@@ -239,27 +237,12 @@ function showContextMenu(e, index) {
 
 function menuAction(action) {
     if (contextTargetIndex === -1) return;
-    
-    // startPosを考慮した実際のデータ配列上のインデックス
     const startPos = parseInt(document.getElementById('startPos').value) || 0;
-    
-    // プレビュー上のインデックス(contextTargetIndex) から startPos を引く必要はない
-    // プレビューは0番目から順番に labelData を表示しているわけではなく、
-    // 「startPos分は空けて、そのあと labelData[0]」という表示ロジックではない。
-    // labelData自体に「空白」を含めて管理する方が「編集」の観点では直感的だが、
-    // 今回の仕様（startPosは使いさし用）に合わせると、
-    // labelData[0] は プレビューの [startPos] の位置に表示される。
-    
-    // つまり、クリックされたセル(i) が startPos未満なら、それはデータ管理外の「使いさしエリア」。
-    // データがあるのは i >= startPos の場所。
-    // データ配列上のインデックス = i - startPos
-    
     let dataIdx = contextTargetIndex - startPos;
 
     if (action === 'insert') {
-        // データ範囲外なら配列を拡張して対応
         ensureArrayLength(dataIdx);
-        labelData.splice(dataIdx, 0, ""); // 空白挿入
+        labelData.splice(dataIdx, 0, "");
     } 
     else if (action === 'delete') {
         if (dataIdx >= 0 && dataIdx < labelData.length) {
@@ -271,33 +254,22 @@ function menuAction(action) {
         labelData[dataIdx] = "";
     }
     else if (action === 'pagebreak') {
-        // 次のページの先頭インデックスを計算
-        // 現在位置 contextTargetIndex
         const nextPageStart = Math.floor(contextTargetIndex / itemsPerPage + 1) * itemsPerPage;
         const spacesNeeded = nextPageStart - contextTargetIndex;
-        
         ensureArrayLength(dataIdx);
-        // 現在位置(dataIdx)に spacesNeeded 個の空白を挿入
         for(let k=0; k<spacesNeeded; k++) {
             labelData.splice(dataIdx, 0, "");
         }
     }
-    
     render();
 }
 
 function ensureArrayLength(targetIdx) {
-    // targetIdxまで配列が届いてなければ空文字で埋める
-    // dataIdxがマイナス(startPosより前)の場合は操作できないので無視で良いが、
-    // 使いさしエリアに文字を入れたい場合は startPos を減らす操作になる。
-    // ここでは「使いさしエリア」への操作は無効とする。
     if (targetIdx < 0) return;
-    while (labelData.length <= targetIdx) {
-        labelData.push("");
-    }
+    while (labelData.length <= targetIdx) labelData.push("");
 }
 
-// --- リスト編集モーダル ---
+// --- リスト編集モーダル (修正箇所: Textarea化) ---
 function openEditModal() {
     const body = document.getElementById('listEditorBody');
     body.innerHTML = "";
@@ -305,7 +277,6 @@ function openEditModal() {
     labelData.forEach((text, i) => {
         addListRowUI(body, i, text);
     });
-    // 空行も少し追加しておく
     if(labelData.length === 0) addListRowUI(body, 0, "");
 
     document.getElementById('editModal').style.display = 'flex';
@@ -314,11 +285,13 @@ function openEditModal() {
 function addListRowUI(container, index, text) {
     const div = document.createElement('div');
     div.className = 'list-row';
+    // Textareaに変更し、valueプロパティで値をセット
     div.innerHTML = `
         <div class="list-idx">${index+1}</div>
-        <input type="text" class="list-input" value="${text}">
+        <textarea class="list-input" rows="1"></textarea>
         <div class="list-del" onclick="this.parentElement.remove()">🗑</div>
     `;
+    div.querySelector('textarea').value = text;
     container.appendChild(div);
 }
 
@@ -326,7 +299,6 @@ function addListRow() {
     const body = document.getElementById('listEditorBody');
     const idx = body.children.length;
     addListRowUI(body, idx, "");
-    // スクロール一番下へ
     body.scrollTop = body.scrollHeight;
 }
 
@@ -336,7 +308,6 @@ function saveListEdit() {
     inputs.forEach(input => {
         labelData.push(input.value); 
     });
-    // 末尾の連続する空白は削除してもいいが、ユーザーが意図的に入れた改ページ用の空白かもしれないので残す
     closeEditModal();
     render();
 }
@@ -345,7 +316,7 @@ function closeEditModal() {
     document.getElementById('editModal').style.display = 'none';
 }
 
-// --- データ操作 ---
+// --- データ処理 ---
 function loadSample() {
     labelData = ["現金", "当座\n預金", "普通\n預金", "受取\n手形", "売掛金", "棚卸\n資産", "前払\n費用", "建物", "減価償却\n累計額"];
     render();
@@ -366,7 +337,6 @@ function parseCSV(text) {
     let list = [];
     text.split(/\r\n|\n|\r/).forEach(line => {
         const cols = line.split(',');
-        // 2列目優先、なければ1列目
         let val = "";
         if (cols.length >= 2) val = cols[1];
         else if (cols.length === 1) val = cols[0];
@@ -377,7 +347,7 @@ function parseCSV(text) {
     return list;
 }
 
-// --- フォントサイズ計算 ---
+// --- 描画・サイズ計算 ---
 function updateFontSize(element, text) {
     if (!text) { element.style.fontSize = `${BASE_SIZE_MM}mm`; return; }
     const lines = text.split(/\n/);
@@ -388,14 +358,11 @@ function updateFontSize(element, text) {
     element.style.fontSize = `${size}mm`;
 }
 
-// --- 直接編集の同期 ---
 function handleInput(e) {
     const target = e.target;
     const isPlus = target.classList.contains('text-plus');
     const text = target.innerText;
     
-    // データ配列の更新 (targetは .cell > .center-axis > .text-wrapper)
-    // cellを探す
     const cell = target.closest('.cell');
     if(cell) {
         const idx = parseInt(cell.dataset.index);
@@ -417,19 +384,13 @@ function handleInput(e) {
     }
 }
 
-// --- 描画処理 ---
 function render() {
     const container = document.getElementById('previewArea');
     container.innerHTML = "";
     
     const startPos = parseInt(document.getElementById('startPos').value) || 0;
     const totalSlots = startPos + labelData.length;
-    // データがなくても最低1ページ
     const pageCount = Math.max(1, Math.ceil(totalSlots / itemsPerPage));
-    
-    // データがちょうどページ末尾で終わっている場合、
-    // 「次の文字を追加したい」ニーズのために +1 ページあると親切だが、
-    // 印刷時は邪魔になるので、配列が空でなければピッタリで止める。
     
     for (let p = 0; p < pageCount; p++) {
         const sheet = document.createElement('div');
@@ -443,11 +404,8 @@ function render() {
             const cell = document.createElement('div');
             cell.className = 'cell';
             cell.dataset.index = globalIdx;
-            
-            // 右クリックイベント
             cell.addEventListener('contextmenu', (e) => showContextMenu(e, globalIdx));
 
-            // データ取得
             let text = "";
             const dataIdx = globalIdx - startPos;
             if (dataIdx >= 0 && dataIdx < labelData.length) {
@@ -460,7 +418,7 @@ function render() {
             const textPlus = document.createElement('div');
             textPlus.className = 'label-text-wrapper text-plus';
             textPlus.contentEditable = true; 
-            textPlus.innerText = text; // innerTextにすることで改行反映
+            textPlus.innerText = text; 
             
             const textMinus = document.createElement('div');
             textMinus.className = 'label-text-wrapper text-minus';
@@ -473,7 +431,6 @@ function render() {
             textPlus.addEventListener('input', handleInput);
             textMinus.addEventListener('input', handleInput);
             
-            // セルクリックでフォーカス
             cell.onclick = function(e) {
                 if (e.target === cell) textPlus.focus();
             };
