@@ -3,59 +3,84 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>位置ガイド (点のみ)</title>
+<title>位置ガイド (ドットのみ)</title>
 <style>
-    body { margin: 0; padding: 0; background: #eee; font-family: sans-serif; }
+    body { margin: 0; padding: 0; background: #eee; font-family: sans-serif; color: #333; }
 
     /* コントロールバー */
     #controls {
-        position: sticky; top: 0; background: #333; color: white; padding: 10px;
+        position: sticky; top: 0; background: #fff; border-bottom: 1px solid #ccc; padding: 10px 20px;
         display: flex; gap: 20px; align-items: center; z-index: 100;
-        font-size: 0.9rem;
+        font-size: 0.9rem; flex-wrap: wrap;
     }
-    input { width: 50px; padding: 4px; text-align: right; }
-    button { padding: 5px 15px; cursor: pointer; font-weight: bold; }
+    .input-group { display: flex; align-items: center; gap: 5px; }
+    input { width: 50px; padding: 5px; text-align: right; border: 1px solid #ccc; border-radius: 4px; }
+    button { 
+        padding: 6px 16px; cursor: pointer; font-weight: bold; 
+        background: #333; color: white; border: none; border-radius: 4px; 
+    }
+    button:hover { background: #555; }
 
     /* プレビューエリア */
     #preview {
-        padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 20px;
+        padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 30px;
     }
 
     /* 用紙設定 (A4 縦) */
     @page { size: A4 portrait; margin: 0; }
+    
     .sheet {
         width: 210mm; height: 297mm; background: white;
         position: relative; overflow: hidden;
-        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         page-break-after: always;
     }
 
     /* 点 (・) のスタイル */
     .dot {
         position: absolute;
-        right: 0; /* 右端ピッタリ */
-        width: 2mm; height: 1px; /* 極小の横棒のような点 */
-        background: #000;
-        /* もし完全な「丸」が良い場合は以下を有効化 */
-        /* width: 2mm; height: 2mm; border-radius: 50%; transform: translate(50%, -50%); */
+        width: 2mm; height: 2mm;      /* 小さい丸 */
+        background-color: #ccc;       /* 薄いグレー */
+        border-radius: 50%;           /* 丸くする */
+        transform: translateY(-50%);  /* 上下中央揃え */
+        pointer-events: none;
     }
 
+    /* 印刷時の設定 */
     @media print {
         body { background: white; }
         #controls { display: none; }
         #preview { padding: 0; margin: 0; display: block; }
-        .sheet { margin: 0; box-shadow: none; }
+        .sheet { margin: 0; box-shadow: none; border: none; }
     }
 </style>
 </head>
 <body>
 
 <div id="controls">
-    <label>総ページ数 <input type="number" id="totalPages" value="12" min="1" onchange="render()"></label>
-    <label>山の数(周回) <input type="number" id="loopCount" value="12" min="1" onchange="render()"></label>
-    <label>ラベル高さ(mm) <input type="number" id="pitch" value="23" step="0.5" onchange="render()"></label>
-    <label>開始位置(mm) <input type="number" id="startTop" value="0" min="0" onchange="render()"></label>
-    <button onclick="window.print()">印刷</button>
+    <div class="input-group">
+        <label>ページ数</label>
+        <input type="number" id="totalPages" value="12" min="1" onchange="render()">
+    </div>
+    <div class="input-group">
+        <label>山の数</label>
+        <input type="number" id="loopCount" value="12" min="1" onchange="render()">
+    </div>
+    <div class="input-group">
+        <label>ラベル高さ(mm)</label>
+        <input type="number" id="pitch" value="23" step="0.5" onchange="render()">
+    </div>
+    <div class="input-group">
+        <label>開始位置(mm)</label>
+        <input type="number" id="startTop" value="0" min="0" onchange="render()">
+    </div>
+    <div class="input-group">
+        <label>右からの距離(mm)</label>
+        <input type="number" id="rightMargin" value="5" min="0" onchange="render()">
+    </div>
+    
+    <div style="flex-grow:1"></div>
+    <button onclick="window.print()">🖨 印刷</button>
 </div>
 
 <div id="preview"></div>
@@ -71,12 +96,13 @@ function render() {
     const loopCount = parseInt(document.getElementById('loopCount').value) || 12;
     const pitch = parseFloat(document.getElementById('pitch').value) || 23;
     const startTop = parseFloat(document.getElementById('startTop').value) || 0;
+    const rightMargin = parseFloat(document.getElementById('rightMargin').value) || 5;
 
     for (let i = 0; i < totalPages; i++) {
         const sheet = document.createElement('div');
         sheet.className = 'sheet';
 
-        // 位置計算: (ページ番号 % 山の数)
+        // 位置計算: (ページ番号 % 山の数) -> 0, 1, 2...
         const posIndex = i % loopCount;
         
         // 中心座標: 開始位置 + (個数 * 高さ) + (高さ / 2)
@@ -84,8 +110,10 @@ function render() {
 
         const dot = document.createElement('div');
         dot.className = 'dot';
-        // 点を右端、計算した高さの中心に配置
+        
+        // 位置合わせ
         dot.style.top = centerY + 'mm'; 
+        dot.style.right = rightMargin + 'mm'; // 指定したミリ数だけ内側へ
 
         sheet.appendChild(dot);
         container.appendChild(sheet);
